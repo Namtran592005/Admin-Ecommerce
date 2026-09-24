@@ -1,23 +1,34 @@
 import { useEffect, useState } from 'react';
-import { Tabs, Table, Button, Modal, Form, Input, InputNumber, Select, Tag, message, Descriptions, Row, Col } from 'antd';
-import { PlusOutlined } from '@ant-design/icons';
+import { Plus, Eye } from 'lucide-react';
+import { toast } from 'sonner';
 import { api, errMsg, fmtVND, fmtDate } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import { t, opts } from '../utils/status';
+import { Button } from '../components/ui/button';
+import { Input, Field } from '../components/ui/input';
+import { Card, CardContent, Badge } from '../components/ui/card';
+import { TableWrap, THead, Tr, Th, Td, Empty, PageHeader } from '../components/ui/table';
+import { Tabs, StatusBadge } from '../components/ui/misc';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
 import { OrderPicker } from '../components/pickers';
+
+const inputCls = 'flex h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm shadow-sm';
 
 export default function Payments() {
   const { can } = useAuth();
   const writable = can('payments.write');
+  const [tab, setTab] = useState('pay');
   const [pays, setPays] = useState([]);
   const [refs, setRefs] = useState([]);
   const [methods, setMethods] = useState([]);
   const [sel, setSel] = useState(null);
   const [refOpen, setRefOpen] = useState(false);
   const [refOrder, setRefOrder] = useState(null);
-  const [form] = Form.useForm();
+  const [amount, setAmount] = useState('');
+  const [reason, setReason] = useState('');
+
   const load = (quiet = false) => {
-    api.get('/payments').then((r) => setPays(r.data)).catch((e) => { if (!quiet) message.error(errMsg(e)); });
+    api.get('/payments').then((r) => setPays(r.data)).catch((e) => { if (!quiet) toast.error(errMsg(e)); });
     api.get('/payments/refunds/list').then((r) => setRefs(r.data)).catch(() => {});
     api.get('/payments/methods').then((r) => setMethods(r.data)).catch(() => {});
   };
@@ -29,86 +40,109 @@ export default function Payments() {
 
   const open = async (id) => {
     try { const { data } = await api.get(`/payments/${id}`); setSel(data); }
-    catch (e) { message.error(errMsg(e)); }
+    catch (e) { toast.error(errMsg(e)); }
   };
   const markPaid = async (id) => {
-    try { await api.post(`/payments/${id}/mark-paid`); message.success('Đã gạch đã thu'); load(true); setSel(null); }
-    catch (e) { message.error(errMsg(e)); }
+    try { await api.post(`/payments/${id}/mark-paid`); toast.success('Đã gạch đã thu'); load(true); setSel(null); }
+    catch (e) { toast.error(errMsg(e)); }
   };
-  const createRefund = async (v) => {
-    if (!refOrder) return message.warning('Chọn đơn hàng');
-    try { await api.post('/payments/refunds', { ...v, order_id: refOrder }); message.success('Đã tạo yêu cầu hoàn tiền'); setRefOpen(false); form.resetFields(); setRefOrder(null); load(true); }
-    catch (e) { message.error(errMsg(e)); }
+  const createRefund = async () => {
+    if (!refOrder) return toast.warning('Chọn đơn hàng');
+    if (!amount) return toast.error('Nhập số tiền');
+    try { await api.post('/payments/refunds', { order_id: refOrder, amount: Number(amount), reason }); toast.success('Đã tạo yêu cầu hoàn tiền'); setRefOpen(false); setAmount(''); setReason(''); setRefOrder(null); load(true); }
+    catch (e) { toast.error(errMsg(e)); }
   };
   const refundStatus = async (id, status) => {
-    try { await api.patch(`/payments/refunds/${id}/status`, { status }); message.success('Đã cập nhật'); load(true); }
-    catch (e) { message.error(errMsg(e)); }
+    try { await api.patch(`/payments/refunds/${id}/status`, { status }); toast.success('Đã cập nhật'); load(true); }
+    catch (e) { toast.error(errMsg(e)); }
   };
 
   return (
-    <div className="page-card">
-      <Tabs items={[
-        { key: 'pay', label: 'Thanh toán', children: (
-          <Table size="small" dataSource={pays} rowKey="id" pagination={{ pageSize: 12 }} columns={[
-            { title: 'ID', dataIndex: 'id' }, { title: 'Đơn', dataIndex: 'order_id' },
-            { title: 'Phương thức', dataIndex: 'method_code', render: (v) => t('paymethod', v) },
-            { title: 'Số tiền', dataIndex: 'amount', render: fmtVND },
-            { title: 'Trạng thái', dataIndex: 'status', render: (v) => <Tag color={v === 'paid' ? 'green' : v === 'failed' ? 'red' : 'default'}>{t('payment', v)}</Tag> },
-            { title: 'Đã thu', dataIndex: 'paid_at', render: fmtDate },
-            { title: '', render: (_, r) => <>
-              <Button size="small" onClick={() => open(r.id)}>Chi tiết</Button>{' '}
-              {writable && r.status !== 'paid' && <Button size="small" type="primary" onClick={() => markPaid(r.id)}>Gạch đã thu</Button>}
-            </> },
-          ]} />
-        ) },
-        { key: 'ref', label: 'Hoàn tiền', children: (<>
-          {writable && <Button type="primary" icon={<PlusOutlined />} onClick={() => setRefOpen(true)} style={{ marginBottom: 12 }}>Tạo hoàn tiền</Button>}
-          <Table size="small" dataSource={refs} rowKey="id" pagination={{ pageSize: 12 }} columns={[
-            { title: 'Số', dataIndex: 'refund_number' }, { title: 'Đơn', dataIndex: 'order_id' },
-            { title: 'Số tiền', dataIndex: 'amount', render: fmtVND },
-            { title: 'Lý do', dataIndex: 'reason' },
-            { title: 'Trạng thái', dataIndex: 'status', render: (v) => <Tag>{t('refund', v)}</Tag> },
-            { title: '', render: (_, r) => writable && (
-              <Select size="small" placeholder="Đổi trạng thái" style={{ width: 150 }} value={r.status}
-                onChange={(v) => refundStatus(r.id, v)} options={opts('refund', ['requested', 'approved', 'processing', 'completed', 'failed', 'cancelled'])} />
-            ) },
-          ]} />
-        </>) },
-        { key: 'm', label: 'Phương thức', children: (
-          <Table size="small" dataSource={methods} rowKey="id" pagination={false} columns={[
-            { title: 'Mã', dataIndex: 'code' }, { title: 'Tên', dataIndex: 'name' },
-            { title: 'Loại', dataIndex: 'type', render: (v) => t('paymethod', v) },
-            { title: 'Bật', dataIndex: 'is_active', render: (v) => <Tag color={v ? 'green' : 'default'}>{v ? 'Có' : 'Không'}</Tag> },
-          ]} />
-        ) },
-      ]} />
+    <div>
+      <PageHeader title="Thanh toán" actions={writable && tab === 'ref' && <Button onClick={() => setRefOpen(true)}><Plus />Tạo hoàn tiền</Button>} />
+      <Card><CardContent className="pt-4">
+        <Tabs active={tab} onChange={setTab} tabs={[
+          { key: 'pay', label: 'Thanh toán' }, { key: 'ref', label: 'Hoàn tiền' }, { key: 'm', label: 'Phương thức' },
+        ]} />
+        {tab === 'pay' && (
+          <><TableWrap><table className="w-full text-sm">
+            <THead><Tr><Th>ID</Th><Th>Đơn</Th><Th>Phương thức</Th><Th>Số tiền</Th><Th>Trạng thái</Th><Th>Đã thu</Th><Th /></Tr></THead>
+            <tbody>{pays.map((r) => (
+              <Tr key={r.id}>
+                <Td>{r.id}</Td><Td>{r.order_id}</Td><Td>{t('paymethod', r.method_code)}</Td><Td>{fmtVND(r.amount)}</Td>
+                <Td><StatusBadge group="payment" value={r.status} /></Td>
+                <Td className="whitespace-nowrap">{fmtDate(r.paid_at)}</Td>
+                <Td><div className="flex gap-1.5">
+                  <Button size="sm" variant="outline" onClick={() => open(r.id)}><Eye />Chi tiết</Button>
+                  {writable && r.status !== 'paid' && <Button size="sm" onClick={() => markPaid(r.id)}>Gạch đã thu</Button>}
+                </div></Td>
+              </Tr>
+            ))}</tbody>
+          </table></TableWrap>
+          {!pays.length && <Empty />}</>
+        )}
+        {tab === 'ref' && (
+          <><TableWrap><table className="w-full text-sm">
+            <THead><Tr><Th>Số</Th><Th>Đơn</Th><Th>Số tiền</Th><Th>Lý do</Th><Th>Trạng thái</Th><Th /></Tr></THead>
+            <tbody>{refs.map((r) => (
+              <Tr key={r.id}>
+                <Td>{r.refund_number}</Td><Td>{r.order_id}</Td><Td>{fmtVND(r.amount)}</Td><Td>{r.reason}</Td>
+                <Td><StatusBadge group="refund" value={r.status} /></Td>
+                <Td>{writable && (
+                  <select className="h-8 rounded-lg border border-slate-200 bg-white px-2 text-xs" value={r.status}
+                    onChange={(e) => refundStatus(r.id, e.target.value)}>
+                    {opts('refund', ['requested', 'approved', 'processing', 'completed', 'failed', 'cancelled']).map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </select>
+                )}</Td>
+              </Tr>
+            ))}</tbody>
+          </table></TableWrap>
+          {!refs.length && <Empty />}</>
+        )}
+        {tab === 'm' && (
+          <TableWrap><table className="w-full text-sm">
+            <THead><Tr><Th>Mã</Th><Th>Tên</Th><Th>Loại</Th><Th>Bật</Th></Tr></THead>
+            <tbody>{methods.map((m) => <Tr key={m.id}><Td>{m.code}</Td><Td>{m.name}</Td>
+              <Td><Badge>{t('paymethod', m.type)}</Badge></Td>
+              <Td><Badge color={m.is_active ? 'green' : 'default'}>{m.is_active ? 'Có' : 'Không'}</Badge></Td></Tr>)}</tbody>
+          </table></TableWrap>
+        )}
+      </CardContent></Card>
 
-      <Modal title="Chi tiết thanh toán" open={!!sel} onCancel={() => setSel(null)} footer={null} width={640}>
-        {sel && (<>
-          <Descriptions bordered size="small" column={{ xs: 1, sm: 2 }}>
-            <Descriptions.Item label="Đơn">{sel.order_id}</Descriptions.Item>
-            <Descriptions.Item label="Số tiền">{fmtVND(sel.amount)}</Descriptions.Item>
-            <Descriptions.Item label="Trạng thái">{t('payment', sel.status)}</Descriptions.Item>
-            <Descriptions.Item label="Đã thu">{fmtDate(sel.paid_at)}</Descriptions.Item>
-          </Descriptions>
-          <h4 style={{ marginTop: 12 }}>Giao dịch ({sel.transactions.length})</h4>
-          <Table size="small" pagination={false} dataSource={sel.transactions} rowKey="id" columns={[
-            { title: 'Loại', dataIndex: 'transaction_type', render: (v) => t('paytype', v) },
-            { title: 'Kết quả', dataIndex: 'status', render: (v) => <Tag>{t('txtype', v)}</Tag> },
-            { title: 'Số tiền', dataIndex: 'amount', render: fmtVND },
-            { title: 'Mã chống trùng', dataIndex: 'idempotency_key' },
-          ]} />
-        </>)}
-      </Modal>
-      <Modal title="Tạo hoàn tiền" open={refOpen} width={560} okText="Lưu" cancelText="Hủy" onCancel={() => setRefOpen(false)} onOk={() => form.submit()}>
-        <Form form={form} layout="vertical" onFinish={createRefund}>
-          <Form.Item label="Đơn hàng" required><OrderPicker value={refOrder} onChange={setRefOrder} /></Form.Item>
-          <Row gutter={12}>
-            <Col span={12}><Form.Item name="amount" label="Số tiền" rules={[{ required: true, message: 'Nhập số tiền' }]}><InputNumber style={{ width: '100%' }} min={1} /></Form.Item></Col>
-            <Col span={12}><Form.Item name="reason" label="Lý do"><Input /></Form.Item></Col>
-          </Row>
-        </Form>
-      </Modal>
+      <Dialog open={!!sel} onOpenChange={(o) => !o && setSel(null)}>
+        <DialogContent className="sm:max-w-xl">
+          <DialogHeader><DialogTitle>Thanh toán #{sel?.id}</DialogTitle></DialogHeader>
+          {sel && (<>
+            <dl className="grid grid-cols-1 gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
+              <div className="flex justify-between border-b border-slate-100 py-1.5"><dt className="text-slate-500">Đơn</dt><dd className="font-medium">{sel.order_id}</dd></div>
+              <div className="flex justify-between border-b border-slate-100 py-1.5"><dt className="text-slate-500">Số tiền</dt><dd className="font-medium">{fmtVND(sel.amount)}</dd></div>
+              <div className="flex justify-between border-b border-slate-100 py-1.5"><dt className="text-slate-500">Trạng thái</dt><dd><StatusBadge group="payment" value={sel.status} /></dd></div>
+              <div className="flex justify-between border-b border-slate-100 py-1.5"><dt className="text-slate-500">Đã thu</dt><dd>{fmtDate(sel.paid_at)}</dd></div>
+            </dl>
+            <h4 className="mb-2 mt-3 text-sm font-semibold">Giao dịch ({sel.transactions.length})</h4>
+            <TableWrap><table className="w-full text-sm">
+              <THead><Tr><Th>Loại</Th><Th>Kết quả</Th><Th>Số tiền</Th><Th>Mã chống trùng</Th></Tr></THead>
+              <tbody>{sel.transactions.map((x) => <Tr key={x.id}><Td>{t('paytype', x.transaction_type)}</Td>
+                <Td><Badge>{t('txtype', x.status)}</Badge></Td><Td>{fmtVND(x.amount)}</Td><Td>{x.idempotency_key}</Td></Tr>)}</tbody>
+            </table></TableWrap>
+          </>)}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={refOpen} onOpenChange={setRefOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Tạo hoàn tiền</DialogTitle></DialogHeader>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="Đơn hàng *" className="sm:col-span-2"><OrderPicker value={refOrder} onChange={setRefOrder} /></Field>
+            <Field label="Số tiền *"><Input type="number" min={1} value={amount} onChange={(e) => setAmount(e.target.value)} /></Field>
+            <Field label="Lý do"><Input value={reason} onChange={(e) => setReason(e.target.value)} /></Field>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRefOpen(false)}>Hủy</Button>
+            <Button onClick={createRefund}>Lưu</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

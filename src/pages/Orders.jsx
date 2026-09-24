@@ -1,12 +1,18 @@
 import { useEffect, useRef, useState } from 'react';
-import { Table, Tag, Input, Select, Button, Drawer, Descriptions, Tabs, Timeline, Input as AntInput, message, Space, Popconfirm } from 'antd';
-import { EyeOutlined } from '@ant-design/icons';
+import { Eye } from 'lucide-react';
+import { toast } from 'sonner';
 import { api, errMsg, fmtVND, fmtDate } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import { t, opts } from '../utils/status';
+import { Button } from '../components/ui/button';
+import { Input } from '../components/ui/input';
+import { Card, CardContent, Badge } from '../components/ui/card';
+import { TableWrap, THead, Tr, Th, Td, Pagination, Empty, Toolbar, PageHeader } from '../components/ui/table';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
 
-const STATUS_COLOR = { pending: 'default', confirmed: 'blue', processing: 'cyan', packed: 'geekblue', shipping: 'orange', delivered: 'green', completed: 'green', cancelled: 'red', returned: 'volcano', refunded: 'purple' };
 const NEXT = { pending: ['confirmed', 'cancelled'], confirmed: ['processing', 'cancelled'], processing: ['packed', 'cancelled'], packed: ['shipping', 'cancelled'], shipping: ['delivered', 'returned'], delivered: ['completed', 'returned'], completed: [], cancelled: [], returned: ['refunded'], refunded: [] };
+
+const inputCls = 'flex h-9 rounded-lg border border-slate-200 bg-white px-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40';
 
 export default function Orders() {
   const { can } = useAuth();
@@ -16,6 +22,8 @@ export default function Orders() {
   const [pg, setPg] = useState({ page: 1, limit: 15, total: 0 });
   const [f, setF] = useState({ status: '', payment_status: '', search: '' });
   const [sel, setSel] = useState(null);
+  const [tab, setTab] = useState('info');
+  const [note, setNote] = useState('');
   const pgRef = useRef(pg);
   pgRef.current = pg;
 
@@ -24,7 +32,7 @@ export default function Orders() {
     try {
       const { data } = await api.get('/orders', { params: { page, limit: pgRef.current.limit, ...f } });
       setRows(data.data); setPg({ page, limit: pgRef.current.limit, total: data.pagination.total });
-    } catch (e) { if (!quiet) message.error(errMsg(e)); } finally { if (!quiet) setLoading(false); }
+    } catch (e) { if (!quiet) toast.error(errMsg(e)); } finally { if (!quiet) setLoading(false); }
   };
   useEffect(() => { load(1); }, []);
   useEffect(() => {
@@ -33,100 +41,137 @@ export default function Orders() {
   }, []);
 
   const open = async (id, quiet = false) => {
-    try { const { data } = await api.get(`/orders/${id}`); setSel(data); }
-    catch (e) { if (!quiet) message.error(errMsg(e)); }
+    try { const { data } = await api.get(`/orders/${id}`); setSel(data); setTab('info'); }
+    catch (e) { if (!quiet) toast.error(errMsg(e)); }
   };
   const changeStatus = async (status) => {
     try {
       await api.patch(`/orders/${sel.id}/status`, { status });
-      message.success('Đã chuyển: ' + t('order', status));
+      toast.success('Đã chuyển: ' + t('order', status));
       open(sel.id, true); load(pg.page, true);
-    } catch (e) { message.error(errMsg(e)); }
+    } catch (e) { toast.error(errMsg(e)); }
   };
-  const addNote = async (note) => {
-    if (!note?.trim()) return;
-    try { await api.post(`/orders/${sel.id}/notes`, { note }); message.success('Đã ghi chú'); open(sel.id, true); }
-    catch (e) { message.error(errMsg(e)); }
+  const addNote = async () => {
+    if (!note.trim()) return;
+    try { await api.post(`/orders/${sel.id}/notes`, { note }); toast.success('Đã ghi chú'); setNote(''); open(sel.id, true); }
+    catch (e) { toast.error(errMsg(e)); }
   };
+
+  const subTabs = [
+    { key: 'info', label: 'Thông tin' },
+    { key: 'items', label: `Món hàng (${sel?.items.length || 0})` },
+    { key: 'addr', label: 'Địa chỉ' },
+    { key: 'hist', label: 'Lịch sử' },
+    { key: 'notes', label: `Ghi chú (${sel?.notes.length || 0})` },
+  ];
 
   return (
-    <div className="page-card">
-      <div className="toolbar">
-        <Select placeholder="Trạng thái" allowClear style={{ width: 170 }} value={f.status || undefined}
-          onChange={(v) => setF({ ...f, status: v || '' })} options={opts('order', Object.keys(NEXT))} />
-        <Select placeholder="Thanh toán" allowClear style={{ width: 170 }} value={f.payment_status || undefined}
-          onChange={(v) => setF({ ...f, payment_status: v || '' })}
-          options={opts('pay', ['unpaid', 'pending', 'paid', 'failed', 'refunded'])} />
-        <Input.Search placeholder="Mã đơn ORD..." style={{ width: 220 }} value={f.search}
-          onChange={(e) => setF({ ...f, search: e.target.value })} onSearch={() => load(1)} />
-        <Button type="primary" onClick={() => load(1)}>Lọc</Button>
-      </div>
-      <Table loading={loading} dataSource={rows} rowKey="id"
-        pagination={{ current: pg.page, pageSize: pg.limit, total: pg.total, onChange: (p) => load(p) }}
-        columns={[
-          { title: 'Mã đơn', dataIndex: 'order_number', render: (v, r) => <a onClick={() => open(r.id)}>{v}</a> },
-          { title: 'Trạng thái', dataIndex: 'status', render: (v) => <Tag color={STATUS_COLOR[v]}>{t('order', v)}</Tag> },
-          { title: 'Thanh toán', dataIndex: 'payment_status', render: (v) => <Tag>{t('pay', v)}</Tag> },
-          { title: 'Tổng', dataIndex: 'total_amount', render: fmtVND },
-          { title: 'Coupon', dataIndex: 'coupon_code' },
-          { title: 'Ngày đặt', dataIndex: 'placed_at', render: fmtDate },
-          { title: '', render: (_, r) => <Button icon={<EyeOutlined />} onClick={() => open(r.id)}>Chi tiết</Button> },
-        ]} />
+    <div>
+      <PageHeader title="Đơn hàng" />
+      <Card><CardContent className="pt-4">
+        <Toolbar>
+          <select className={inputCls} style={{ width: 170 }} value={f.status} onChange={(e) => setF({ ...f, status: e.target.value })}>
+            <option value="">Trạng thái</option>
+            {opts('order', Object.keys(NEXT)).map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
+          <select className={inputCls} style={{ width: 170 }} value={f.payment_status} onChange={(e) => setF({ ...f, payment_status: e.target.value })}>
+            <option value="">Thanh toán</option>
+            {opts('pay', ['unpaid', 'pending', 'paid', 'failed', 'refunded']).map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
+          <Input placeholder="Mã đơn ORD..." value={f.search} className="max-w-[220px]"
+            onChange={(e) => setF({ ...f, search: e.target.value })} onKeyDown={(e) => e.key === 'Enter' && load(1)} />
+          <Button onClick={() => load(1)}>Lọc</Button>
+        </Toolbar>
+        <TableWrap><table className="w-full text-sm">
+          <THead><Tr>
+            <Th>Mã đơn</Th><Th>Trạng thái</Th><Th>Thanh toán</Th><Th>Tổng</Th><Th>Coupon</Th><Th>Ngày đặt</Th><Th />
+          </Tr></THead>
+          <tbody>
+            {rows.map((r) => (
+              <Tr key={r.id}>
+                <Td><button className="font-medium text-brand-600 hover:underline" onClick={() => open(r.id)}>{r.order_number}</button></Td>
+                <Td><Badge color={{ pending: 'default', confirmed: 'blue', processing: 'cyan', packed: 'geekblue', shipping: 'orange', delivered: 'green', completed: 'green', cancelled: 'red', returned: 'volcano', refunded: 'purple' }[r.status]}>{t('order', r.status)}</Badge></Td>
+                <Td><Badge>{t('pay', r.payment_status)}</Badge></Td>
+                <Td>{fmtVND(r.total_amount)}</Td>
+                <Td>{r.coupon_code || '—'}</Td>
+                <Td className="whitespace-nowrap">{fmtDate(r.placed_at)}</Td>
+                <Td><Button size="sm" variant="outline" onClick={() => open(r.id)}><Eye />Chi tiết</Button></Td>
+              </Tr>
+            ))}
+          </tbody>
+        </table></TableWrap>
+        {!rows.length && !loading && <Empty />}
+        <Pagination page={pg.page} limit={pg.limit} total={pg.total} onChange={(p) => load(p)} />
+      </CardContent></Card>
 
-      <Drawer title={sel && `Đơn ${sel.order_number}`} width={720} open={!!sel} onClose={() => setSel(null)}>
-        {sel && (
-          <Tabs items={[
-            { key: 'info', label: 'Thông tin', children: (
-              <>
-                <Descriptions bordered size="small" column={{ xs: 1, sm: 2 }}>
-                  <Items label="Trạng thái"><Tag color={STATUS_COLOR[sel.status]}>{t('order', sel.status)}</Tag></Items>
-                  <Items label="Thanh toán"><Tag>{t('pay', sel.payment_status)}</Tag></Items>
-                  <Items label="Tạm tính">{fmtVND(sel.subtotal)}</Items>
-                  <Items label="Giảm giá">{fmtVND(sel.order_discount_amount)}</Items>
-                  <Items label="Phí ship">{fmtVND(sel.shipping_fee)}</Items>
-                  <Items label="Tổng">{fmtVND(sel.total_amount)}</Items>
-                  <Items label="Ghi chú" span={2}>{sel.customer_note || '—'}</Items>
-                </Descriptions>
-                {writable && (
-                  <Space style={{ marginTop: 12 }} wrap>
-                    {(NEXT[sel.status] || []).map((s) => (
-                      <Popconfirm key={s} title={`Chuyển sang "${t('order', s)}"?`} okText="Đồng ý" cancelText="Hủy" onConfirm={() => changeStatus(s)}>
-                        <Button type={s === 'cancelled' ? 'default' : 'primary'} danger={s === 'cancelled'}>{t('order', s)}</Button>
-                      </Popconfirm>
-                    ))}
-                  </Space>
-                )}
-              </>
-            ) },
-            { key: 'items', label: `Món hàng (${sel.items.length})`, children: (
-              <Table size="small" pagination={false} dataSource={sel.items} rowKey="id" columns={[
-                { title: 'Sản phẩm', dataIndex: 'product_name_snapshot' },
-                { title: 'SKU', dataIndex: 'sku_snapshot' },
-                { title: 'Giá', dataIndex: 'unit_price', render: fmtVND },
-                { title: 'SL', dataIndex: 'quantity' },
-                { title: 'Tổng', dataIndex: 'total_amount', render: fmtVND },
-              ]} />
-            ) },
-            { key: 'addr', label: 'Địa chỉ', children: sel.addresses.map((a) => (
-              <Descriptions key={a.id} title={a.address_type === 'shipping' ? 'Giao hàng' : 'Thanh toán'} bordered size="small" style={{ marginBottom: 8 }}>
-                <Descriptions.Item label="Người nhận">{a.recipient_name} · {a.phone}</Descriptions.Item>
-                <Descriptions.Item label="Địa chỉ" span={2}>{`${a.address_line}, ${a.ward_name || ''}, ${a.district_name || ''}, ${a.province_name}`}</Descriptions.Item>
-              </Descriptions>
-            )) },
-            { key: 'hist', label: 'Lịch sử', children: (
-              <Timeline items={sel.history.map((h) => ({ label: fmtDate(h.created_at), children: `${t('order', h.from_status) || '—'} → ${t('order', h.to_status)}${h.note ? ` (${h.note})` : ''}` }))} />
-            ) },
-            { key: 'notes', label: `Ghi chú (${sel.notes.length})`, children: (
-              <>
-                {sel.notes.map((n) => <p key={n.id}>• [{fmtDate(n.created_at)}] {n.note}</p>)}
-                <AntInput.Search placeholder="Thêm ghi chú..." enterButton="Lưu" onSearch={(v) => addNote(v)} />
-              </>
-            ) },
-          ]} />
-        )}
-      </Drawer>
+      <Dialog open={!!sel} onOpenChange={(o) => !o && setSel(null)}>
+        <DialogContent className="sm:max-w-3xl">
+          <DialogHeader><DialogTitle>Đơn {sel?.order_number}</DialogTitle></DialogHeader>
+          {sel && (<>
+            <div className="flex gap-1 overflow-x-auto border-b border-slate-200">
+              {subTabs.map((tb) => (
+                <button key={tb.key} onClick={() => setTab(tb.key)}
+                  className={`whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium ${tab === tb.key ? 'border-brand-500 text-brand-600' : 'border-transparent text-slate-500'}`}>
+                  {tb.label}
+                </button>
+              ))}
+            </div>
+            {tab === 'info' && (<>
+              <dl className="grid grid-cols-1 gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
+                {[['Trạng thái', t('order', sel.status)], ['Thanh toán', t('pay', sel.payment_status)], ['Tạm tính', fmtVND(sel.subtotal)], ['Giảm giá', fmtVND(sel.order_discount_amount)], ['Phí ship', fmtVND(sel.shipping_fee)], ['Tổng', fmtVND(sel.total_amount)]].map(([k, v]) => (
+                  <div key={k} className="flex justify-between border-b border-slate-100 py-1.5"><dt className="text-slate-500">{k}</dt><dd className="font-medium">{v}</dd></div>
+                ))}
+                <div className="sm:col-span-2"><dt className="text-slate-500">Ghi chú khách</dt><dd>{sel.customer_note || '—'}</dd></div>
+              </dl>
+              {writable && (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {(NEXT[sel.status] || []).map((s) => (
+                    <Button key={s} size="sm" variant={s === 'cancelled' ? 'destructive' : 'default'} onClick={() => changeStatus(s)}>
+                      {t('order', s)}
+                    </Button>
+                  ))}
+                </div>
+              )}
+            </>)}
+            {tab === 'items' && (
+              <TableWrap><table className="w-full text-sm">
+                <THead><Tr><Th>Sản phẩm</Th><Th>SKU</Th><Th>Giá</Th><Th>SL</Th><Th>Tổng</Th></Tr></THead>
+                <tbody>{sel.items.map((it) => <Tr key={it.id}><Td>{it.product_name_snapshot}</Td><Td>{it.sku_snapshot}</Td><Td>{fmtVND(it.unit_price)}</Td><Td>{it.quantity}</Td><Td>{fmtVND(it.total_amount)}</Td></Tr>)}</tbody>
+              </table></TableWrap>
+            )}
+            {tab === 'addr' && (
+              <div className="grid gap-2">
+                {sel.addresses.map((a) => (
+                  <div key={a.id} className="rounded-lg border p-3 text-sm">
+                    <div className="font-medium">{a.address_type === 'shipping' ? 'Giao hàng' : 'Thanh toán'} · {a.recipient_name} · {a.phone}</div>
+                    <div className="text-slate-600">{`${a.address_line}, ${a.ward_name || ''}, ${a.district_name || ''}, ${a.province_name}`}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+            {tab === 'hist' && (
+              <ol className="grid gap-2 text-sm">
+                {sel.history.map((h) => (
+                  <li key={h.id} className="rounded-lg bg-slate-50 px-3 py-2">
+                    <span className="font-medium">{h.from_status ? t('order', h.from_status) + ' → ' : ''}{t('order', h.to_status)}</span>
+                    {h.note && <span className="text-slate-500"> ({h.note})</span>}
+                    <div className="text-xs text-slate-400">{fmtDate(h.created_at)}</div>
+                  </li>
+                ))}
+              </ol>
+            )}
+            {tab === 'notes' && (<>
+              <div className="grid gap-2 text-sm">
+                {sel.notes.map((n) => <p key={n.id} className="rounded-lg bg-slate-50 px-3 py-2">[{fmtDate(n.created_at)}] {n.note}</p>)}
+              </div>
+              <div className="mt-2 flex gap-2">
+                <Input placeholder="Thêm ghi chú..." value={note} onChange={(e) => setNote(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addNote()} />
+                <Button onClick={addNote}>Lưu</Button>
+              </div>
+            </>)}
+          </>)}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
-
-const Items = Descriptions.Item;

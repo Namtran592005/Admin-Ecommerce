@@ -1,12 +1,25 @@
 import { useEffect, useState } from 'react';
-import { Row, Col, Card, Statistic, Table, Tag, Typography, Spin, message, Button, Space } from 'antd';
-import { ShoppingOutlined, DollarOutlined, WarningOutlined, PhoneOutlined, PlusOutlined, GiftOutlined, StockOutlined, RiseOutlined } from '@ant-design/icons';
 import { Link } from 'react-router-dom';
+import { DollarSign, ShoppingCart, TrendingUp, TriangleAlert, Phone, Plus, Gift, Warehouse } from 'lucide-react';
+import { toast } from 'sonner';
 import { api, errMsg, fmtVND, fmtDate } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import { t } from '../utils/status';
+import { Card, CardHeader, CardTitle, CardContent, Badge } from '../components/ui/card';
+import { Button } from '../components/ui/button';
+import { TableWrap, THead, Tr, Th, Td, Empty } from '../components/ui/table';
 
 const dayKey = (d) => d.toISOString().slice(0, 10);
+
+function Stat({ title, value, icon, tint }) {
+  return (
+    <Card><CardContent className="pt-5">
+      <span className={`mb-2 inline-flex size-11 items-center justify-center rounded-xl ${tint}`}>{icon}</span>
+      <div className="text-2xl font-bold tracking-tight">{value}</div>
+      <div className="text-sm text-slate-500">{title}</div>
+    </CardContent></Card>
+  );
+}
 
 export default function Dashboard() {
   const { can } = useAuth();
@@ -15,7 +28,7 @@ export default function Dashboard() {
   const [bars, setBars] = useState([]);
 
   const refresh = (quiet = false) => {
-    api.get('/reports/summary').then((r) => setData(r.data)).catch((e) => { if (!quiet) message.error(errMsg(e)); });
+    api.get('/reports/summary').then((r) => setData(r.data)).catch((e) => { if (!quiet) toast.error(errMsg(e)); });
     if (can('orders.read')) {
       api.get('/orders', { params: { page: 1, limit: 100 } }).then((r) => {
         const rows = r.data.data || [];
@@ -39,79 +52,88 @@ export default function Dashboard() {
     return () => clearInterval(id);
   }, []);
 
-  if (!data) return <Spin />;
+  if (!data) return <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{[0, 1, 2, 3].map((i) => <div key={i} className="h-32 animate-pulse rounded-xl bg-white" />)}</div>;
   const { all_time, today, top_products, low_stock, by_payment } = data;
   const maxBar = Math.max(1, ...bars.map((b) => b.total));
 
-  const stat = (title, value, icon, bg) => (
-    <Card className="stat-card" styles={{ body: { padding: 16 } }}>
-      <span className="stat-icon" style={{ background: bg }}>{icon}</span>
-      <Statistic title={title} value={value} />
-    </Card>
-  );
-
   return (
     <div>
-      <Typography.Title level={3} style={{ marginTop: 0 }}>Tổng quan kinh doanh</Typography.Title>
-      <Row gutter={[16, 16]}>
-        <Col xs={24} sm={12} lg={6}>{stat('Doanh thu (chưa hủy)', fmtVND(all_time.revenue), <DollarOutlined style={{ color: '#15803d' }} />, '#dcfce7')}</Col>
-        <Col xs={24} sm={12} lg={6}>{stat('Tổng đơn hàng', all_time.total_orders, <ShoppingOutlined style={{ color: '#0f4c81' }} />, '#dbeafe')}</Col>
-        <Col xs={24} sm={12} lg={6}>{stat('Đơn hôm nay', today.n, <RiseOutlined style={{ color: '#b45309' }} />, '#fef3c7')}</Col>
-        <Col xs={24} sm={12} lg={6}>{stat('Doanh thu hôm nay', fmtVND(today.revenue), <DollarOutlined style={{ color: '#7c3aed' }} />, '#ede9fe')}</Col>
-      </Row>
+      <h1 className="mb-4 text-xl font-semibold tracking-tight">Tổng quan kinh doanh</h1>
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <Stat title="Doanh thu (chưa hủy)" value={fmtVND(all_time.revenue)} icon={<DollarSign className="size-5 text-emerald-700" />} tint="bg-emerald-100" />
+        <Stat title="Tổng đơn hàng" value={all_time.total_orders} icon={<ShoppingCart className="size-5 text-brand-600" />} tint="bg-blue-100" />
+        <Stat title="Đơn hôm nay" value={today.n} icon={<TrendingUp className="size-5 text-amber-700" />} tint="bg-amber-100" />
+        <Stat title="Doanh thu hôm nay" value={fmtVND(today.revenue)} icon={<DollarSign className="size-5 text-violet-700" />} tint="bg-violet-100" />
+      </div>
 
-      <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
-        <Col xs={24} lg={14}>
-          <Card title="Doanh thu 7 ngày gần nhất" styles={{ body: { paddingTop: 4 } }}>
-            {bars.length ? (
-              <div className="mini-bars">
-                {bars.map((b) => (
-                  <div className="mini-bar" key={b.label}>
-                    <span className="val">{b.total >= 1000 ? (b.total / 1000).toFixed(0) + 'k' : b.total}</span>
-                    <div className="col" style={{ height: Math.max(4, (b.total / maxBar) * 100) }} />
-                    <span className="lbl">{b.label}</span>
-                  </div>
-                ))}
-              </div>
-            ) : <Typography.Text type="secondary">Không có quyền xem đơn hàng.</Typography.Text>}
+      <div className="mt-4 grid gap-4 lg:grid-cols-5">
+        <div className="grid content-start gap-4 lg:col-span-3">
+          <Card>
+            <CardHeader className="pb-1"><CardTitle>Doanh thu 7 ngày gần nhất</CardTitle></CardHeader>
+            <CardContent className="pt-1">
+              {bars.length ? (
+                <div className="flex h-28 items-end gap-2.5">
+                  {bars.map((b) => (
+                    <div key={b.label} className="flex min-w-0 flex-1 flex-col items-center gap-0.5">
+                      <span className="text-[11px] font-semibold">{b.total >= 1000 ? (b.total / 1000).toFixed(0) + 'k' : b.total}</span>
+                      <div className="w-full max-w-11 rounded-t-md bg-gradient-to-t from-brand-600 to-brand-500/70" style={{ height: Math.max(4, (b.total / maxBar) * 68) }} />
+                      <span className="text-[11px] text-slate-500">{b.label}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : <p className="text-sm text-slate-500">Không có quyền xem đơn hàng.</p>}
+            </CardContent>
           </Card>
-          <Card title="Đơn mới nhất" style={{ marginTop: 16 }}>
-            <Table size="small" pagination={false} dataSource={recent} rowKey="id" columns={[
-              { title: 'Mã đơn', dataIndex: 'order_number' },
-              { title: 'Trạng thái', dataIndex: 'status', render: (v) => <Tag>{t('order', v)}</Tag> },
-              { title: 'Tổng', dataIndex: 'total_amount', render: fmtVND },
-              { title: 'Ngày', dataIndex: 'created_at', render: fmtDate },
-            ]} />
+          <Card>
+            <CardHeader><CardTitle>Đơn mới nhất</CardTitle></CardHeader>
+            <CardContent>
+              {recent.length ? (
+                <TableWrap><table className="w-full min-w-[520px] text-sm">
+                  <THead><Tr><Th>Mã đơn</Th><Th>Trạng thái</Th><Th>Tổng</Th><Th>Ngày</Th></Tr></THead>
+                  <tbody>{recent.map((o) => <Tr key={o.id}><Td>{o.order_number}</Td><Td><Badge color="blue">{t('order', o.status)}</Badge></Td><Td>{fmtVND(o.total_amount)}</Td><Td>{fmtDate(o.created_at)}</Td></Tr>)}</tbody>
+                </table></TableWrap>
+              ) : <Empty />}
+            </CardContent>
           </Card>
-        </Col>
-        <Col xs={24} lg={10}>
-          <Card title="Thao tác nhanh">
-            <Space wrap>
-              {can('orders.write') && <Link to="/pos"><Button type="primary" icon={<PhoneOutlined />}>Tạo đơn hộ</Button></Link>}
-              {can('products.write') && <Link to="/products"><Button icon={<PlusOutlined />}>Thêm sản phẩm</Button></Link>}
-              {can('promotions.write') && <Link to="/promotions"><Button icon={<GiftOutlined />}>Tạo coupon</Button></Link>}
-              {can('inventory.write') && <Link to="/inventory"><Button icon={<StockOutlined />}>Nhập tồn</Button></Link>}
-            </Space>
+        </div>
+        <div className="grid content-start gap-4 lg:col-span-2">
+          <Card>
+            <CardHeader><CardTitle>Thao tác nhanh</CardTitle></CardHeader>
+            <CardContent className="flex flex-wrap gap-2">
+              {can('orders.write') && <Link to="/pos"><Button><Phone />Tạo đơn</Button></Link>}
+              {can('products.write') && <Link to="/products"><Button variant="outline"><Plus />Thêm sản phẩm</Button></Link>}
+              {can('promotions.write') && <Link to="/promotions"><Button variant="outline"><Gift />Tạo coupon</Button></Link>}
+              {can('inventory.write') && <Link to="/inventory"><Button variant="outline"><Warehouse />Nhập tồn</Button></Link>}
+            </CardContent>
           </Card>
-          <Card title={<span><WarningOutlined /> Tồn kho sắp hết</span>} style={{ marginTop: 16 }}>
-            <Table size="small" pagination={false} dataSource={low_stock} rowKey={(r) => r.warehouse_id + '-' + r.variant_id} columns={[
-              { title: 'Kho', dataIndex: 'warehouse_id' },
-              { title: 'Biến thể', dataIndex: 'variant_id' },
-              { title: 'Khả dụng', dataIndex: 'available_quantity' },
-            ]} />
+          <Card>
+            <CardHeader><CardTitle className="flex items-center gap-1.5"><TriangleAlert className="size-4 text-amber-600" />Tồn kho sắp hết</CardTitle></CardHeader>
+            <CardContent>
+              {low_stock.length ? (
+                <TableWrap><table className="w-full min-w-[320px] text-sm">
+                  <THead><Tr><Th>Kho</Th><Th>Biến thể</Th><Th>Khả dụng</Th></Tr></THead>
+                  <tbody>{low_stock.map((r) => <Tr key={r.warehouse_id + '-' + r.variant_id}><Td>{r.warehouse_id}</Td><Td>{r.variant_id}</Td><Td>{r.available_quantity}</Td></Tr>)}</tbody>
+                </table></TableWrap>
+              ) : <Empty text="Tồn kho ổn định" />}
+            </CardContent>
           </Card>
-          <Card title="Sản phẩm bán chạy" style={{ marginTop: 16 }}>
-            <Table size="small" pagination={false} dataSource={top_products} rowKey="product_id" columns={[
-              { title: 'Sản phẩm', dataIndex: 'name' },
-              { title: 'SL', dataIndex: 'qty' },
-              { title: 'Doanh thu', dataIndex: 'revenue', render: fmtVND },
-            ]} />
+          <Card>
+            <CardHeader><CardTitle>Sản phẩm bán chạy</CardTitle></CardHeader>
+            <CardContent>
+              <TableWrap><table className="w-full min-w-[320px] text-sm">
+                <THead><Tr><Th>Sản phẩm</Th><Th>SL</Th><Th>Doanh thu</Th></Tr></THead>
+                <tbody>{top_products.map((p) => <Tr key={p.product_id}><Td>{p.name}</Td><Td>{p.qty}</Td><Td>{fmtVND(p.revenue)}</Td></Tr>)}</tbody>
+              </table></TableWrap>
+            </CardContent>
           </Card>
-          <Card title="Đơn theo thanh toán" style={{ marginTop: 16 }}>
-            {(by_payment || []).map((p) => <Tag key={p.payment_status} style={{ margin: 4 }}>{t('pay', p.payment_status)}: {p.n}</Tag>)}
+          <Card>
+            <CardHeader><CardTitle>Đơn theo thanh toán</CardTitle></CardHeader>
+            <CardContent className="flex flex-wrap gap-1.5">
+              {(by_payment || []).map((p) => <Badge key={p.payment_status}>{t('pay', p.payment_status)}: {p.n}</Badge>)}
+            </CardContent>
           </Card>
-        </Col>
-      </Row>
+        </div>
+      </div>
     </div>
   );
 }

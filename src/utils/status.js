@@ -1,4 +1,13 @@
 // Từ điển trạng thái tiếng Việt cho toàn bộ admin
+export const ROLE_VI = {
+  super_admin: 'Quản trị tối cao',
+  store_manager: 'Quản lý cửa hàng',
+  warehouse_staff: 'Nhân viên kho',
+  customer_support: 'Chăm sóc khách hàng',
+  marketing: 'Tiếp thị',
+  customer: 'Khách hàng',
+};
+export const roleVI = (code) => ROLE_VI[code] || code;
 export const VI = {
   order: { pending: 'Chờ xác nhận', confirmed: 'Đã xác nhận', processing: 'Đang xử lý', packed: 'Đã đóng gói', shipping: 'Đang giao', delivered: 'Đã giao', completed: 'Hoàn tất', cancelled: 'Đã hủy', returned: 'Đã trả hàng', refunded: 'Đã hoàn tiền' },
   pay: { unpaid: 'Chưa thanh toán', pending: 'Chờ', paid: 'Đã thanh toán', partially_refunded: 'Hoàn một phần', refunded: 'Đã hoàn tiền', failed: 'Thất bại' },

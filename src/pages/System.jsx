@@ -1,68 +1,98 @@
 import { useEffect, useState } from 'react';
-import { Tabs, Table, Tag, message, Input, Button } from 'antd';
+import { toast } from 'sonner';
 import { api, errMsg, fmtDate } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
+import { Button } from '../components/ui/button';
+import { Input } from '../components/ui/input';
+import { Card, CardContent, Badge } from '../components/ui/card';
+import { TableWrap, THead, Tr, Th, Td, Empty, PageHeader } from '../components/ui/table';
+import { Tabs } from '../components/ui/misc';
 
 export default function System() {
   const { can } = useAuth();
   const canSettings = can('settings.write');
   const canAudit = can('audit.read');
+  const [tab, setTab] = useState(canSettings ? 's' : 'n');
   const [settings, setSettings] = useState([]);
   const [notifs, setNotifs] = useState([]);
   const [audits, setAudits] = useState([]);
   const [editKey, setEditKey] = useState(null);
   const [editVal, setEditVal] = useState('');
 
-  const load = () => {
+  const load = (quiet = false) => {
     if (canSettings) api.get('/settings').then((r) => setSettings(r.data)).catch(() => {});
-    api.get('/notifications').then((r) => setNotifs(r.data)).catch(() => {});
+    api.get('/notifications').then((r) => setNotifs(r.data)).catch((e) => { if (!quiet) toast.error(errMsg(e)); });
     if (canAudit) api.get('/audit-logs').then((r) => setAudits(r.data)).catch(() => {});
   };
   useEffect(() => { load(); }, []);
+  useEffect(() => {
+    const id = setInterval(() => { if (document.visibilityState === 'visible') load(true); }, 60000);
+    return () => clearInterval(id);
+  }, []);
 
   const saveSetting = async () => {
     try {
       let value;
       try { value = JSON.parse(editVal); } catch { value = editVal; }
       await api.put(`/settings/${editKey}`, { value });
-      message.success('Đã lưu'); setEditKey(null); load();
-    } catch (e) { message.error(errMsg(e)); }
+      toast.success('Đã lưu'); setEditKey(null); load(true);
+    } catch (e) { toast.error(errMsg(e)); }
   };
   const markRead = async (id) => {
-    try { await api.patch(`/notifications/${id}/read`); load(); }
-    catch (e) { message.error(errMsg(e)); }
+    try { await api.patch(`/notifications/${id}/read`); load(true); }
+    catch (e) { toast.error(errMsg(e)); }
   };
 
   return (
-    <div className="page-card">
-      <Tabs items={[
-        ...(canSettings ? [{ key: 's', label: 'Cấu hình', children: (
-          <Table size="small" dataSource={settings} rowKey="setting_key" pagination={false} columns={[
-            { title: 'Khóa', dataIndex: 'setting_key' },
-            { title: 'Giá trị', dataIndex: 'setting_value', render: (v) => <code>{JSON.stringify(v)}</code> },
-            { title: 'Công khai', dataIndex: 'is_public', render: (v) => v ? <Tag color="green">Có</Tag> : '—' },
-            { title: '', render: (_, r) => editKey === r.setting_key ? (<>
-              <Input value={editVal} onChange={(e) => setEditVal(e.target.value)} style={{ width: 200 }} />{' '}
-              <Button size="small" type="primary" onClick={saveSetting}>Lưu</Button>
-            </>) : <Button size="small" onClick={() => { setEditKey(r.setting_key); setEditVal(JSON.stringify(r.setting_value)); }}>Sửa</Button> },
-          ]} />
-        ) }] : []),
-        { key: 'n', label: 'Thông báo', children: (
-          <Table size="small" dataSource={notifs} rowKey="id" pagination={{ pageSize: 12 }} columns={[
-            { title: 'Loại', dataIndex: 'type', render: (v) => <Tag>{v}</Tag> },
-            { title: 'Tiêu đề', dataIndex: 'title' }, { title: 'Nội dung', dataIndex: 'body' },
-            { title: 'Đã đọc', dataIndex: 'read_at', render: (v) => v ? fmtDate(v) : <Tag color="orange">Chưa</Tag> },
-            { title: '', render: (_, r) => !r.read_at && <Button size="small" onClick={() => markRead(r.id)}>Đánh dấu đã đọc</Button> },
-          ]} />
-        ) },
-        ...(canAudit ? [{ key: 'a', label: 'Nhật ký', children: (
-          <Table size="small" dataSource={audits} rowKey="id" pagination={{ pageSize: 12 }} columns={[
-            { title: 'Người', dataIndex: 'actor_user_id' }, { title: 'Hành động', dataIndex: 'action' },
-            { title: 'Đối tượng', dataIndex: 'entity_type' }, { title: 'ID', dataIndex: 'entity_id' },
-            { title: 'Địa chỉ IP', dataIndex: 'ip_address' }, { title: 'Lúc', dataIndex: 'created_at', render: fmtDate },
-          ]} />
-        ) }] : []),
-      ]} />
+    <div>
+      <PageHeader title="Hệ thống" />
+      <Card><CardContent className="pt-4">
+        <Tabs active={tab} onChange={setTab} tabs={[
+          ...(canSettings ? [{ key: 's', label: 'Cấu hình' }] : []),
+          { key: 'n', label: 'Thông báo' },
+          ...(canAudit ? [{ key: 'a', label: 'Nhật ký' }] : []),
+        ]} />
+        {tab === 's' && canSettings && (
+          <TableWrap><table className="w-full text-sm">
+            <THead><Tr><Th>Khóa</Th><Th>Giá trị</Th><Th>Công khai</Th><Th /></Tr></THead>
+            <tbody>{settings.map((r) => (
+              <Tr key={r.setting_key}>
+                <Td className="font-mono text-xs">{r.setting_key}</Td>
+                <Td>{editKey === r.setting_key
+                  ? <Input value={editVal} onChange={(e) => setEditVal(e.target.value)} className="max-w-[240px]" />
+                  : <code className="text-xs">{JSON.stringify(r.setting_value)}</code>}</Td>
+                <Td>{r.is_public ? <Badge color="green">Có</Badge> : '—'}</Td>
+                <Td>{editKey === r.setting_key
+                  ? <div className="flex gap-1.5"><Button size="sm" onClick={saveSetting}>Lưu</Button>
+                    <Button size="sm" variant="outline" onClick={() => setEditKey(null)}>Hủy</Button></div>
+                  : <Button size="sm" variant="outline" onClick={() => { setEditKey(r.setting_key); setEditVal(JSON.stringify(r.setting_value)); }}>Sửa</Button>}</Td>
+              </Tr>
+            ))}</tbody>
+          </table></TableWrap>
+        )}
+        {tab === 'n' && (
+          <><TableWrap><table className="w-full text-sm">
+            <THead><Tr><Th>Loại</Th><Th>Tiêu đề</Th><Th>Nội dung</Th><Th>Đã đọc</Th><Th /></Tr></THead>
+            <tbody>{notifs.map((r) => (
+              <Tr key={r.id}>
+                <Td><Badge>{r.type}</Badge></Td><Td>{r.title}</Td><Td>{r.body}</Td>
+                <Td>{r.read_at ? fmtDate(r.read_at) : <Badge color="orange">Chưa</Badge>}</Td>
+                <Td>{!r.read_at && <Button size="sm" variant="outline" onClick={() => markRead(r.id)}>Đánh dấu đã đọc</Button>}</Td>
+              </Tr>
+            ))}</tbody>
+          </table></TableWrap>
+          {!notifs.length && <Empty />}</>
+        )}
+        {tab === 'a' && canAudit && (
+          <TableWrap><table className="w-full text-sm">
+            <THead><Tr><Th>Người</Th><Th>Hành động</Th><Th>Đối tượng</Th><Th>ID</Th><Th>Địa chỉ IP</Th><Th>Lúc</Th></Tr></THead>
+            <tbody>{audits.map((r) => (
+              <Tr key={r.id}><Td>{r.actor_user_id}</Td><Td>{r.action}</Td><Td>{r.entity_type}</Td>
+                <Td>{r.entity_id}</Td><Td>{r.ip_address}</Td><Td className="whitespace-nowrap">{fmtDate(r.created_at)}</Td></Tr>
+            ))}</tbody>
+          </table></TableWrap>
+        )}
+      </CardContent></Card>
     </div>
   );
 }

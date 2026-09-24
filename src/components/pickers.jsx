@@ -1,7 +1,12 @@
 import { useState } from 'react';
-import { Select, Modal, Row, Col, Card, Image, Input, Button, Tag, message, Typography } from 'antd';
+import { Search, Check, X } from 'lucide-react';
+import { toast } from 'sonner';
 import { api, errMsg, fmtVND } from '../api/client';
 import { t } from '../utils/status';
+import { Button } from './ui/button';
+import { Input } from './ui/input';
+import { Badge } from './ui/card';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 
 const mediaBase = () => (import.meta.env.VITE_API_BASE || 'http://127.0.0.1/api').replace(/\/api$/, '');
 export const mediaUrl = (key) => `${mediaBase()}/files/unimate/${key}`;
@@ -16,32 +21,36 @@ export function VariantPicker({ onPick }) {
     try {
       const { data } = await api.get('/products', { params: { search: q.trim(), limit: 8 } });
       setProducts(data.data || []);
-    } catch (e) { message.error(errMsg(e)); }
+    } catch (e) { toast.error(errMsg(e)); }
   };
   const pick = async (p) => {
     try {
       const { data } = await api.get(`/products/slug/${p.slug}`);
       setDetail(data);
-    } catch (e) { message.error(errMsg(e)); }
+    } catch (e) { toast.error(errMsg(e)); }
   };
   return (
-    <>
-      <Input.Search placeholder="Tìm sản phẩm theo tên/SKU..." value={q}
-        onChange={(e) => setQ(e.target.value)} onSearch={search} style={{ marginBottom: 8 }} />
+    <div className="grid gap-2">
+      <div className="flex gap-2">
+        <Input placeholder="Tìm sản phẩm theo tên/SKU..." value={q}
+          onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && search()} />
+        <Button variant="outline" onClick={search}><Search />Tìm</Button>
+      </div>
       {products.map((p) => (
-        <Card key={p.id} size="small" style={{ marginBottom: 6 }}
-          extra={<Button size="small" onClick={() => pick(p)}>Chọn</Button>}>
-          {p.name} · {fmtVND(p.base_price)}
-        </Card>
-      ))}
-      {detail && (detail.variants || []).map((v) => (
-        <div key={v.id} style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 6 }}>
-          <Tag>{v.sku}</Tag><span style={{ flex: 1 }}>{v.name} · {fmtVND(v.price)}</span>
-          <Tag color={v.available_qty > 0 ? 'green' : 'red'}>Còn {v.available_qty}</Tag>
-          <Button size="small" type="primary" onClick={() => onPick(v, detail)}>Chọn</Button>
+        <div key={p.id} className="flex items-center justify-between gap-2 rounded-lg border px-3 py-2 text-sm">
+          <span className="truncate">{p.name} · {fmtVND(p.base_price)}</span>
+          <Button size="sm" variant="outline" onClick={() => pick(p)}>Chọn</Button>
         </div>
       ))}
-    </>
+      {(detail?.variants || []).map((v) => (
+        <div key={v.id} className="flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2 text-sm">
+          <Badge>{v.sku}</Badge>
+          <span className="flex-1 truncate">{v.name} · {fmtVND(v.price)}</span>
+          <Badge color={v.available_qty > 0 ? 'green' : 'red'}>Còn {v.available_qty}</Badge>
+          <Button size="sm" onClick={() => onPick(v, detail)}>Chọn</Button>
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -56,12 +65,16 @@ export function OrderPicker({ value, onChange, placeholder = 'Tìm mã đơn ORD
     } catch { /* ignore */ }
   };
   return (
-    <Select showSearch value={value} placeholder={placeholder} filterOption={false}
-      onSearch={search} onChange={onChange} options={options} allowClear style={{ width: '100%' }} />
+    <select value={value || ''} onChange={(e) => onChange(e.target.value ? Number(e.target.value) : null)}
+      onFocus={() => { if (!options.length) search('ORD'); }}
+      className="flex h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm shadow-sm">
+      <option value="">{placeholder}</option>
+      {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+    </select>
   );
 }
 
-// Chọn ảnh từ thư viện (xem trước). kind: 'all' | 'image' (banner chỉ nhận ảnh)
+// Chọn ảnh từ thư viện (xem trước). kind: 'all' | 'image'
 export function MediaPicker({ value, onChange, kind = 'all' }) {
   const [open, setOpen] = useState(false);
   const [rows, setRows] = useState([]);
@@ -70,7 +83,7 @@ export function MediaPicker({ value, onChange, kind = 'all' }) {
     try {
       const { data } = await api.get('/media');
       setRows(data || []);
-    } catch (e) { message.error(errMsg(e)); }
+    } catch (e) { toast.error(errMsg(e)); }
   };
   const isImg = (m) => (m.mime_type || '').startsWith('image/');
   const filtered = rows.filter((m) =>
@@ -78,25 +91,37 @@ export function MediaPicker({ value, onChange, kind = 'all' }) {
     (!q || (m.original_name || '').toLowerCase().includes(q.toLowerCase())));
   return (
     <>
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-        <Input value={value || ''} placeholder="Chưa chọn ảnh" readOnly style={{ width: 120 }} />
-        <Button onClick={() => { setOpen(true); load(); }}>Chọn từ thư viện</Button>
-        {value && <Button onClick={() => onChange(null)}>Xóa</Button>}
+      <div className="flex items-center gap-2">
+        <Input value={value || ''} placeholder="Chưa chọn ảnh" readOnly className="w-28" />
+        <Button type="button" variant="outline" onClick={() => { setOpen(true); load(); }}>Chọn từ thư viện</Button>
+        {value && <Button type="button" variant="ghost" onClick={() => onChange(null)}><X />Xóa</Button>}
       </div>
-      <Modal title="Chọn ảnh" open={open} onCancel={() => setOpen(false)} footer={null} width={760}
-        okText="Đóng" cancelText="Đóng">
-        <Input.Search placeholder="Tìm theo tên file..." value={q} onChange={(e) => setQ(e.target.value)} style={{ marginBottom: 12, maxWidth: 320 }} />
-        <Row gutter={[12, 12]}>
-          {filtered.map((m) => (
-            <Col xs={12} sm={8} md={6} key={m.id}>
-              <Card size="small" hoverable cover={<Image src={mediaUrl(m.object_key)} height={110} style={{ objectFit: 'cover' }} preview={{ mask: 'Xem' }} />}
-                actions={[<Button key="pick" size="small" type="link" onClick={() => { onChange(m.id); setOpen(false); }}>Chọn #{m.id}</Button>]}>
-                <Typography.Text ellipsis style={{ fontSize: 12 }}>{m.original_name}</Typography.Text>
-              </Card>
-            </Col>
-          ))}
-        </Row>
-      </Modal>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="sm:max-w-3xl">
+          <DialogHeader><DialogTitle>Chọn ảnh</DialogTitle></DialogHeader>
+          <Input placeholder="Tìm theo tên file..." value={q} onChange={(e) => setQ(e.target.value)} className="max-w-xs" />
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+            {filtered.map((m) => (
+              <button key={m.id} onClick={() => { onChange(m.id); setOpen(false); }}
+                className="overflow-hidden rounded-lg border text-left hover:border-brand-500">
+                {isImg(m)
+                  ? <img src={mediaUrl(m.object_key)} alt="" className="h-24 w-full object-cover" loading="lazy" />
+                  : <span className="flex h-24 items-center justify-center bg-slate-100 text-xs text-slate-500">{m.mime_type}</span>}
+                <span className="block truncate px-2 py-1 text-xs">#{m.id} {m.original_name}</span>
+              </button>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
+  );
+}
+
+export function PickedTag({ text, onClear }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-md bg-blue-100 px-2 py-1 text-xs font-medium text-blue-800">
+      <Check className="size-3.5" />{text}
+      <button onClick={onClear} className="rounded p-0.5 hover:bg-blue-200" aria-label="Đổi"><X className="size-3.5" /></button>
+    </span>
   );
 }

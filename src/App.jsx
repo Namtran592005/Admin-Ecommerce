@@ -1,9 +1,8 @@
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
-import { Result, Button } from 'antd';
-import { Link } from 'react-router-dom';
 import AppLayout from './components/AppLayout';
 import { ROUTE_PERMS } from './components/menu';
 import { useAuth } from './auth/AuthContext';
+import { Forbidden, NotFound } from './components/ErrorBoundary';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Orders from './pages/Orders';
@@ -24,17 +23,21 @@ import System from './pages/System';
 function RequireAuth({ children }) {
   const { user, ready } = useAuth();
   const loc = useLocation();
-  if (!ready) return null;
+  if (!ready) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-mist">
+        <span className="flex size-11 items-center justify-center rounded-xl bg-brand-500 text-lg font-bold text-white">U</span>
+        <div className="text-sm text-slate-500">Đang khôi phục phiên đăng nhập...</div>
+      </div>
+    );
+  }
   if (!user) return <Navigate to="/login" state={{ from: loc.pathname }} replace />;
   return children;
 }
 
 function RequirePerm({ path, children }) {
   const { can } = useAuth();
-  if (!can(...(ROUTE_PERMS[path] || []))) {
-    return <Result status="403" title="403" subTitle="Bạn không có quyền xem trang này"
-      extra={<Button type="primary"><Link to="/">Về trang chủ</Link></Button>} />;
-  }
+  if (!can(...(ROUTE_PERMS[path] || []))) return <Forbidden />;
   return children;
 }
 
@@ -62,7 +65,7 @@ export default function App() {
           <Route path="marketing" element={guard('/marketing', <Marketing />)} />
           <Route path="system" element={guard('/system', <System />)} />
         </Route>
-        <Route path="*" element={<Result status="404" title="404" subTitle="Không tìm thấy trang" />} />
+        <Route path="*" element={<NotFound />} />
       </Routes>
     </BrowserRouter>
   );

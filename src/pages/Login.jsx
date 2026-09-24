@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react';
-import { Form, Input, Button, Card, Row, Col, Typography, message } from 'antd';
-import { LockOutlined, UserOutlined, ShopOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
+import { Store, User, Lock } from 'lucide-react';
+import { toast } from 'sonner';
 import { useAuth } from '../auth/AuthContext';
 import { errMsg } from '../api/client';
 import { MENU } from '../components/menu';
+import { Button } from '../components/ui/button';
+import { Input } from '../components/ui/input';
+import { Field } from '../components/ui/input';
 
 export default function Login() {
   const [loading, setLoading] = useState(false);
@@ -19,47 +22,50 @@ export default function Login() {
     }
   }, [user, nav]);
 
-  const submit = async (v) => {
+  const submit = async (e) => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const identifier = String(fd.get('identifier') || '').trim();
+    const password = String(fd.get('password') || '');
+    if (!identifier || !password) return toast.error('Nhập đủ tài khoản và mật khẩu');
     setLoading(true);
     try {
-      await login(v.identifier.trim(), v.password);
-      message.success('Đăng nhập thành công');
-    } catch (e) {
-      message.error(errMsg(e, 'Sai tài khoản hoặc mật khẩu'));
+      await login(identifier, password);
+      toast.success('Đăng nhập thành công');
+    } catch (err) {
+      toast.error(errMsg(err, 'Sai tài khoản hoặc mật khẩu'));
     } finally { setLoading(false); }
   };
 
   return (
-    <Row style={{ minHeight: '100vh' }}>
-      <Col xs={0} md={14} style={{
-        background: 'linear-gradient(135deg, #0a2240 0%, #0f4c81 60%, #2f7fd0 100%)',
-        color: '#fff', display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: 64,
-      }}>
-        <ShopOutlined style={{ fontSize: 56, marginBottom: 16 }} />
-        <Typography.Title style={{ color: '#fff', margin: 0 }}>UniMate</Typography.Title>
-        <Typography.Title level={3} style={{ color: 'rgba(255,255,255,.85)', fontWeight: 400 }}>
-          Hệ thống quản trị bán hàng
-        </Typography.Title>
-        <Typography.Paragraph style={{ color: 'rgba(255,255,255,.65)', fontSize: 16, maxWidth: 480 }}>
-          Đơn hàng · Kho · Thanh toán · Khuyến mãi · Báo cáo —
-          phân quyền chi tiết đến từng chức năng cho từng vị trí nhân sự.
-        </Typography.Paragraph>
-      </Col>
-      <Col xs={24} md={10} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#fff', padding: 24 }}>
-        <Card bordered={false} style={{ width: 380, maxWidth: '100%' }}>
-          <Typography.Title level={3}>Đăng nhập quản trị</Typography.Title>
-          <Typography.Text type="secondary">Dành cho nhân viên (tài khoản khách hàng không dùng được trang này).</Typography.Text>
-          <Form layout="vertical" onFinish={submit} style={{ marginTop: 16 }}>
-            <Form.Item name="identifier" label="Email / Số điện thoại" rules={[{ required: true, message: 'Nhập tài khoản' }]}>
-              <Input prefix={<UserOutlined />} placeholder="admin@unimate.vn" autoComplete="username" />
-            </Form.Item>
-            <Form.Item name="password" label="Mật khẩu" rules={[{ required: true, message: 'Nhập mật khẩu' }]}>
-              <Input.Password prefix={<LockOutlined />} placeholder="Mật khẩu" autoComplete="current-password" />
-            </Form.Item>
-            <Button type="primary" htmlType="submit" loading={loading} block size="large">Đăng nhập</Button>
-          </Form>
-        </Card>
-      </Col>
-    </Row>
+    <div className="flex min-h-screen">
+      <div className="hidden flex-col justify-center bg-gradient-to-br from-coal via-brand-700 to-brand-500 p-16 text-white md:flex md:w-[55%]">
+        <Store className="mb-4 size-14" strokeWidth={1.5} />
+        <h1 className="text-4xl font-bold tracking-tight">UniMate</h1>
+        <h2 className="mt-1 text-xl font-normal text-white/80">Hệ thống quản trị bán hàng</h2>
+      </div>
+      <div className="flex flex-1 items-center justify-center bg-white p-6">
+        <form onSubmit={submit} className="w-full max-w-[380px]">
+          <h2 className="text-2xl font-semibold tracking-tight">Đăng nhập</h2>
+          <div className="mt-5 grid gap-4">
+            <Field label="Email / Số điện thoại">
+              <div className="relative">
+                <User className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+                <Input name="identifier" placeholder="admin@example.com" autoComplete="username" className="h-10 pl-9" />
+              </div>
+            </Field>
+            <Field label="Mật khẩu">
+              <div className="relative">
+                <Lock className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+                <Input name="password" type="password" placeholder="••••••••" autoComplete="current-password" className="h-10 pl-9" />
+              </div>
+            </Field>
+            <Button type="submit" size="lg" className="h-11 w-full text-[15px]" disabled={loading}>
+              {loading ? 'Đang đăng nhập...' : 'Đăng nhập'}
+            </Button>
+          </div>
+        </form>
+      </div>
+    </div>
   );
 }

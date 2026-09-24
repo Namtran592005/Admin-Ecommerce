@@ -1,52 +1,31 @@
-* { box-sizing: border-box; }
-body { margin: 0; font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f2f2f5; color: #1d1d1f; -webkit-font-smoothing: antialiased; }
+@import "tailwindcss";
 
-/* Khung */
-.app-sider { background: #161618; }
-.app-sider .ant-menu-dark { background: transparent; }
-.app-sider .brand { display: flex; gap: 10px; align-items: center; padding: 26px 20px 18px; border-bottom: 1px solid rgba(255,255,255,.06); }
-.app-sider .brand .sub { font-size: 11px; color: rgba(255,255,255,.35); text-transform: uppercase; letter-spacing: .06em; font-weight: 500; }
-.app-header { background: #fff; display: flex; justify-content: space-between; align-items: center; padding: 0 16px; box-shadow: 0 1px 4px rgba(0,0,0,.08); position: sticky; top: 0; z-index: 10; }
-.app-content { margin: 20px; min-height: calc(100vh - 104px); }
-.page-card { background: #fff; padding: 20px; border-radius: 12px; box-shadow: 0 1px 3px rgba(15,76,129,.08); }
-.toolbar { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
-
-/* Drawer không tràn màn hình nhỏ */
-.ant-drawer-content-wrapper { max-width: 96vw !important; }
-
-/* Thẻ thống kê doanh nghiệp */
-.stat-card { border-radius: 12px; overflow: hidden; position: relative; }
-.stat-card .stat-icon { width: 44px; height: 44px; border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; font-size: 22px; margin-bottom: 8px; }
-
-/* Biểu đồ cột thuần CSS */
-.mini-bars { display: flex; align-items: flex-end; gap: 10px; height: 140px; padding-top: 8px; }
-.mini-bar { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0; }
-.mini-bar .col { width: 100%; max-width: 44px; border-radius: 6px 6px 0 0; background: linear-gradient(180deg, #2f7fd0, #0f4c81); }
-.mini-bar .lbl { font-size: 11px; color: #888; white-space: nowrap; }
-.mini-bar .val { font-size: 11px; font-weight: 600; white-space: nowrap; }
-
-/* Bảng cuộn ngang trên mobile */
-.page-card .ant-table-wrapper { overflow-x: auto; }
-.page-card .ant-table { min-width: 620px; }
-
-/* Form modal 2-3 cột tự xếp 1 cột trên mobile */
-@media (max-width: 768px) {
-  .ant-modal .ant-row > .ant-col-14,
-  .ant-modal .ant-row > .ant-col-12,
-  .ant-modal .ant-row > .ant-col-10,
-  .ant-modal .ant-row > .ant-col-8,
-  .ant-modal .ant-row > .ant-col-6 { flex: 0 0 100%; max-width: 100%; }
+@theme {
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --color-brand-50: #eef4fa;
+  --color-brand-100: #d8e6f3;
+  --color-brand-500: #0f4c81;
+  --color-brand-600: #0d3f6c;
+  --color-brand-700: #0a3357;
+  --color-ink: #1d1d1f;
+  --color-mist: #f2f2f5;
+  --color-coal: #161618;
 }
 
-/* Steps cuộn ngang trên mobile */
-@media (max-width: 768px) {
-  .ant-steps { overflow-x: auto; padding-bottom: 4px; }
-}
+html { -webkit-font-smoothing: antialiased; }
+body { background: var(--color-mist); color: var(--color-ink); }
 
-/* Mobile / tablet */
-@media (max-width: 768px) {
-  .app-content { margin: 12px; }
-  .page-card { padding: 12px; }
-  .hide-mobile { display: none !important; }
-  .ant-statistic-content { font-size: 20px !important; }
-}
+/* Thanh cuộn mảnh, đồng bộ toàn trang */
+* { scrollbar-width: thin; scrollbar-color: #c3cad4 transparent; }
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb { background: #c3cad4; border-radius: 8px; border: 2px solid transparent; background-clip: content-box; }
+*::-webkit-scrollbar-thumb:hover { background: #94a0b4; background-clip: content-box; border: 2px solid transparent; }
+
+/* Thanh cuộn mảnh cho sidebar */
+.thin-scroll::-webkit-scrollbar { width: 6px; }
+.thin-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,.15); border-radius: 3px; }
+
+/* Grid con không được phình track: bảng rộng cuộn nội bộ thay vì đẩy vỡ layout */
+.grid > * { min-width: 0; }
+.truncate { min-width: 0; }
