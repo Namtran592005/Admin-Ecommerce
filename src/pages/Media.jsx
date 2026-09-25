@@ -34,7 +34,7 @@ export default function Media() {
   const [rows, setRows] = useState([]);
   const [q, setQ] = useState('');
   const [tab, setTab] = useState('all');
-  const [view, setView] = useState('grid');
+  const [view, setView] = useState('list');
   const [selected, setSelected] = useState([]);
   const [lightbox, setLightbox] = useState(null);
 
