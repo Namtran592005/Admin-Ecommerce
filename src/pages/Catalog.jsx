@@ -9,6 +9,7 @@ import { Card, CardContent, Badge } from '../components/ui/card';
 import { TableWrap, THead, Tr, Th, Td, Empty, Toolbar } from '../components/ui/table';
 import { Tabs, ConfirmDialog, IconButton, RowActions } from '../components/ui/misc';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
+import { MediaPicker, mediaUrl } from '../components/pickers';
 
 const CAT_ICONS = ['bi-bag', 'bi-basket', 'bi-basket3', 'bi-tag', 'bi-tags', 'bi-gift', 'bi-house', 'bi-phone', 'bi-laptop', 'bi-controller', 'bi-headphones', 'bi-watch', 'bi-camera', 'bi-bicycle', 'bi-book', 'bi-pencil', 'bi-brush', 'bi-gem', 'bi-lamp', 'bi-tools', 'bi-heart-pulse', 'bi-cup-straw', 'bi-egg-fried', 'bi-cart', 'bi-star', 'bi-truck', 'bi-ticket-perforated'];
 const inputCls = 'flex h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm shadow-sm';
@@ -372,7 +373,15 @@ export default function Catalog() {
               buildPayload={categoryPayload}
               columns={[
                 { key: 'id', title: 'ID' },
-                { key: 'icon', title: 'Biểu tượng', render: (value) => value ? <i className={`bi ${value}`} style={{ fontSize: 18, color: '#0f4c81' }}></i> : '—' },
+                {
+                  key: 'image_key',
+                  title: 'Ảnh',
+                  render: (value, row) => (value
+                    ? <img src={mediaUrl(value)} alt="" className="size-10 border border-slate-200 object-cover" loading="lazy" />
+                    : row.icon
+                      ? <i className={`bi ${row.icon}`} style={{ fontSize: 18, color: '#0f4c81' }}></i>
+                      : '—'),
+                },
                 { key: 'name', title: 'Tên' },
                 { key: 'slug', title: 'Đường dẫn' },
                 { key: 'parent_id', title: 'Danh mục cha' },
@@ -384,7 +393,14 @@ export default function Catalog() {
                 <Field label="Tên *">
                   <Input value={catForm.name || ''} onChange={(e) => setCatForm((value) => ({ ...value, name: e.target.value }))} />
                 </Field>
-                <Field label="Biểu tượng hiển thị ở website">
+                <Field label="Ảnh danh mục (hiện ở trang chủ)">
+                  <MediaPicker
+                    value={catForm.image_media_id || null}
+                    onChange={(id) => setCatForm((value) => ({ ...value, image_media_id: id }))}
+                    kind="image"
+                  />
+                </Field>
+                <Field label="Biểu tượng hiển thị ở website (dùng khi danh mục chưa có ảnh)">
                   <div className="flex items-center gap-2">
                     <select
                       className={inputCls}
@@ -429,6 +445,13 @@ export default function Catalog() {
               buildPayload={brandPayload}
               columns={[
                 { key: 'id', title: 'ID' },
+                {
+                  key: 'logo_key',
+                  title: 'Logo',
+                  render: (value) => (value
+                    ? <img src={mediaUrl(value)} alt="" className="size-10 border border-slate-200 object-contain" loading="lazy" />
+                    : '—'),
+                },
                 { key: 'name', title: 'Tên' },
                 { key: 'slug', title: 'Đường dẫn' },
                 { key: 'status', title: 'Trạng thái', render: (value) => <Badge color={value === 'active' ? 'green' : 'default'}>{value === 'active' ? 'Đang hiện' : 'Đang ẩn'}</Badge> },
@@ -437,6 +460,13 @@ export default function Catalog() {
               <div className="grid gap-3">
                 <Field label="Tên *">
                   <Input value={brandForm.name || ''} onChange={(e) => setBrandForm((value) => ({ ...value, name: e.target.value }))} />
+                </Field>
+                <Field label="Logo thương hiệu">
+                  <MediaPicker
+                    value={brandForm.logo_media_id || null}
+                    onChange={(id) => setBrandForm((value) => ({ ...value, logo_media_id: id }))}
+                    kind="image"
+                  />
                 </Field>
                 <Field label="Mô tả">
                   <Input value={brandForm.description || ''} onChange={(e) => setBrandForm((value) => ({ ...value, description: e.target.value }))} />
