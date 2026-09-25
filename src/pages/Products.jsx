@@ -15,6 +15,49 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 
 const inputCls = 'flex h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm shadow-sm';
 
+function CategoryPicker({ cats, value = [], onChange }) {
+  const roots = cats.filter((c) => !c.parent_id);
+  const childrenOf = (id) => cats.filter((c) => c.parent_id === id);
+  const toggle = (id) => {
+    const set = new Set(value.map(Number));
+    if (set.has(Number(id))) set.delete(Number(id));
+    else set.add(Number(id));
+    onChange([...set]);
+  };
+  const row = (category, depth) => {
+    const checked = value.map(Number).includes(Number(category.id));
+    return (
+      <label
+        key={category.id}
+        className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-slate-50"
+        style={depth ? { paddingLeft: 12 + depth * 18 } : { paddingLeft: 8 }}
+      >
+        <input type="checkbox" checked={checked} onChange={() => toggle(category.id)} className="size-4 accent-brand-600" />
+        <span className={checked ? 'font-medium text-brand-700' : 'text-slate-700'}>{category.name}</span>
+      </label>
+    );
+  };
+  return (
+    <div className="max-h-56 overflow-y-auto rounded-lg border border-slate-200 bg-white p-1">
+      {roots.length ? roots.map((root) => (
+        <div key={root.id}>
+          {row(root, 0)}
+          {childrenOf(root.id).map((child) => row(child, 1))}
+        </div>
+      )) : <p className="px-2 py-3 text-sm text-slate-400">Chưa có danh mục nào.</p>}
+    </div>
+  );
+}
+
+function Section({ title, children, cols = 2 }) {
+  return (
+    <section className="rounded-lg border border-slate-200 p-3">
+      <h4 className="mb-2.5 text-xs font-semibold uppercase tracking-wide text-slate-500">{title}</h4>
+      <div className={`grid gap-3 ${cols === 2 ? 'sm:grid-cols-2' : ''}`}>{children}</div>
+    </section>
+  );
+}
+
 export default function Products() {
   const { can } = useAuth();
   const writable = can('products.write');
@@ -292,37 +335,86 @@ export default function Products() {
           if (!saving && !open) setEditing(null);
         }}
       >
-        <DialogContent className="sm:max-w-2xl">
-          <DialogHeader><DialogTitle>{editing?.id ? 'Sửa sản phẩm' : 'Thêm sản phẩm'}</DialogTitle></DialogHeader>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="Tên *" className="sm:col-span-2"><Input value={form.name || ''} onChange={(e) => setF('name', e.target.value)} /></Field>
-            <Field label="SKU"><Input value={form.sku || ''} onChange={(e) => setF('sku', e.target.value)} /></Field>
-            <Field label="Giá gốc (VND) *"><Input type="number" min={0} value={form.base_price ?? ''} onChange={(e) => setF('base_price', Number(e.target.value))} /></Field>
-            <Field label="Thương hiệu">
-              <select className={inputCls} value={form.brand_id || ''} onChange={(e) => setF('brand_id', e.target.value ? Number(e.target.value) : null)}>
-                <option value="">—</option>
-                {brands.map((brand) => <option key={brand.id} value={brand.id}>{brand.name}</option>)}
-              </select>
-            </Field>
-            <Field label="Trạng thái">
-              <select className={inputCls} value={form.status || 'active'} onChange={(e) => setF('status', e.target.value)}>
-                {opts('product', ['draft', 'active', 'inactive', 'archived']).map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-              </select>
-            </Field>
-            <Field label="Danh mục" className="sm:col-span-2">
-              <select
-                multiple
-                className={`${inputCls} h-24`}
-                value={form.category_ids || []}
-                onChange={(e) => setF('category_ids', [...e.target.selectedOptions].map((option) => Number(option.value)))}
-              >
-                {cats.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
-              </select>
-            </Field>
-            <Field label="Mô tả ngắn" className="sm:col-span-2">
-              <textarea className="flex min-h-[70px] w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" value={form.short_description || ''} onChange={(e) => setF('short_description', e.target.value)} />
-            </Field>
+        <DialogContent className="sm:max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>{editing?.id ? 'Sửa sản phẩm' : 'Thêm sản phẩm'}</DialogTitle>
+            {editing?.id && <p className="text-xs text-slate-500">Mã #{editing.id}{form.slug ? ` · /san-pham/${form.slug}` : ''}</p>}
+          </DialogHeader>
+
+          {editing?.images?.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {editing.images.map((image) => (
+                <div key={image.id} className="relative size-16 overflow-hidden rounded border border-slate-200 bg-slate-50">
+                  {image.object_key
+                    ? <img src={mediaUrl(image.object_key)} alt="" className="size-full object-contain" loading="lazy" />
+                    : <span className="flex size-full items-center justify-center text-[10px] text-slate-400">#{image.media_id}</span>}
+                  {image.is_primary && <span className="absolute inset-x-0 bottom-0 bg-brand-600 py-0.5 text-center text-[10px] font-medium text-white">Ảnh chính</span>}
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="grid gap-3">
+            <Section title="Thông tin chính">
+              <Field label="Tên sản phẩm *" className="sm:col-span-2">
+                <Input value={form.name || ''} onChange={(e) => setF('name', e.target.value)} placeholder="Ví dụ: Áo thun cotton basic" />
+              </Field>
+              <Field label="Đường dẫn (slug)">
+                <Input value={form.slug || ''} onChange={(e) => setF('slug', e.target.value)} placeholder="ao-thun-cotton" />
+              </Field>
+              <Field label="SKU">
+                <Input value={form.sku || ''} onChange={(e) => setF('sku', e.target.value)} />
+              </Field>
+              <Field label="Mô tả ngắn" className="sm:col-span-2">
+                <textarea className="flex min-h-[64px] w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" value={form.short_description || ''} onChange={(e) => setF('short_description', e.target.value)} placeholder="Tóm tắt 1–2 dòng, hiện trên thẻ sản phẩm" />
+              </Field>
+            </Section>
+
+            <Section title="Giá bán">
+              <Field label="Giá bán (VND) *">
+                <Input type="number" min={0} value={form.base_price ?? ''} onChange={(e) => setF('base_price', Number(e.target.value))} />
+              </Field>
+              <Field label="Giá so sánh (VND)">
+                <Input type="number" min={0} value={form.compare_at_price ?? ''} onChange={(e) => setF('compare_at_price', e.target.value === '' ? null : Number(e.target.value))} placeholder="Để trống nếu không giảm giá" />
+              </Field>
+              <Field label="Giá vốn (VND)">
+                <Input type="number" min={0} value={form.cost_price ?? ''} onChange={(e) => setF('cost_price', e.target.value === '' ? null : Number(e.target.value))} />
+              </Field>
+              <Field label="Khối lượng (gram)">
+                <Input type="number" min={0} value={form.weight_grams ?? ''} onChange={(e) => setF('weight_grams', e.target.value === '' ? null : Number(e.target.value))} />
+              </Field>
+            </Section>
+
+            <Section title="Phân loại">
+              <Field label="Thương hiệu">
+                <select className={inputCls} value={form.brand_id || ''} onChange={(e) => setF('brand_id', e.target.value ? Number(e.target.value) : null)}>
+                  <option value="">— Chưa chọn —</option>
+                  {brands.map((brand) => <option key={brand.id} value={brand.id}>{brand.name}</option>)}
+                </select>
+              </Field>
+              <Field label="Trạng thái">
+                <select className={inputCls} value={form.status || 'active'} onChange={(e) => setF('status', e.target.value)}>
+                  {opts('product', ['draft', 'active', 'inactive', 'archived']).map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                </select>
+              </Field>
+              <Field label="Loại sản phẩm">
+                <select className={inputCls} value={form.product_type || 'physical'} onChange={(e) => setF('product_type', e.target.value)}>
+                  <option value="physical">Hàng vật lý</option>
+                  <option value="digital">Sản phẩm số</option>
+                  <option value="service">Dịch vụ</option>
+                </select>
+              </Field>
+              <div className="sm:col-span-2">
+                <Field label="Danh mục (chọn nhiều)">
+                  <CategoryPicker cats={cats} value={form.category_ids || []} onChange={(ids) => setF('category_ids', ids)} />
+                </Field>
+                {(form.category_ids || []).length > 0 && (
+                  <p className="mt-1.5 text-xs text-slate-500">Đã chọn {form.category_ids.length} danh mục.</p>
+                )}
+              </div>
+            </Section>
           </div>
+
           <DialogFooter>
             {editing?.id && (
               <Button variant="destructive" onClick={() => setDeleteTarget(editing)}>
@@ -336,71 +428,123 @@ export default function Products() {
       </Dialog>
 
       <Dialog open={!!detail} onOpenChange={(open) => !open && setDetail(null)}>
-        <DialogContent className="sm:max-w-3xl">
-          <DialogHeader><DialogTitle>Sản phẩm: {detail?.name}</DialogTitle></DialogHeader>
+        <DialogContent className="sm:max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>Chi tiết sản phẩm</DialogTitle>
+            {detail && <p className="text-xs text-slate-500">Mã #{detail.id}{detail.slug ? ` · /san-pham/${detail.slug}` : ''}</p>}
+          </DialogHeader>
           {detail && (
             <>
-              <h4 className="mb-2 text-sm font-semibold">Biến thể ({detail.variants.length})</h4>
-              <TableWrap>
-                <table className="w-full text-sm">
-                  <THead><Tr><Th>SKU</Th><Th>Tên</Th><Th>Giá</Th><Th>Trạng thái</Th></Tr></THead>
-                  <tbody>{detail.variants.map((variant) => <Tr key={variant.id}><Td>{variant.sku}</Td><Td>{variant.name}</Td><Td>{fmtVND(variant.price)}</Td><Td><Badge>{t('variant', variant.status)}</Badge></Td></Tr>)}</tbody>
-                </table>
-              </TableWrap>
-              {writable && (
-                <div className="mt-2 flex flex-wrap gap-2">
-                  <Input placeholder="SKU *" value={vform.sku || ''} onChange={(e) => setVform((value) => ({ ...value, sku: e.target.value }))} className="max-w-[160px]" />
-                  <Input placeholder="Tên (Cỡ M...)" value={vform.name || ''} onChange={(e) => setVform((value) => ({ ...value, name: e.target.value }))} className="max-w-[160px]" />
-                  <Input type="number" placeholder="Giá *" min={0} value={vform.price ?? ''} onChange={(e) => setVform((value) => ({ ...value, price: Number(e.target.value) }))} className="max-w-[140px]" />
-                  <Button size="sm" onClick={addVariant}><Plus />Thêm biến thể</Button>
+              <div className="flex flex-wrap items-center gap-4 rounded-lg border border-slate-200 p-3">
+                <div className="size-20 shrink-0 overflow-hidden rounded border border-slate-200 bg-slate-50">
+                  {detail.images?.[0]?.object_key
+                    ? <img src={mediaUrl(detail.images[0].object_key)} alt="" className="size-full object-contain" />
+                    : <span className="flex size-full items-center justify-center text-[10px] text-slate-400">Chưa có ảnh</span>}
                 </div>
-              )}
-              <h4 className="mb-2 mt-4 text-sm font-semibold">Ảnh ({detail.images.length}) — bấm để xem lớn</h4>
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                {detail.images.map((image) => (
-                  <div key={image.id} className={`overflow-hidden rounded-lg border ${image.is_primary ? 'border-brand-500 ring-1 ring-brand-500' : ''}`}>
-                    <button onClick={() => viewImage(image)} className="relative block h-24 w-full bg-slate-100">
-                      {image.object_key
-                        ? <img src={mediaUrl(image.object_key)} alt={image.alt_text || ''} className="h-full w-full object-cover" loading="lazy" />
-                        : <span className="flex h-full items-center justify-center text-xs text-slate-400">Ảnh #{image.media_id}</span>}
-                      {image.is_primary && <span className="absolute left-1 top-1 rounded bg-brand-500 px-1.5 py-0.5 text-[11px] font-medium text-white">Chính</span>}
-                    </button>
-                    {writable && (
-                      <div className="grid gap-1 p-1.5">
-                        <Input
-                          placeholder="Chú thích..."
-                          value={image.alt_text || ''}
-                          onChange={(e) => setDetail((value) => ({ ...value, images: value.images.map((item) => item.id === image.id ? { ...item, alt_text: e.target.value } : item) }))}
-                          onBlur={(e) => updateImage(image.id, { alt_text: e.target.value })}
-                          className="h-7 text-xs"
-                        />
-                        <div className="flex items-center gap-1">
-                          <Input type="number" title="Thứ tự" min={0} defaultValue={image.sort_order} onBlur={(e) => updateImage(image.id, { sort_order: Number(e.target.value) || 0 })} className="h-7 w-14 text-xs" />
-                          {!image.is_primary && (
-                            <Button size="sm" variant="outline" title="Đặt làm ảnh chính" onClick={() => updateImage(image.id, { is_primary: true })}>
-                              <Star />
-                            </Button>
-                          )}
-                          <Button size="sm" variant="ghost" title="Xóa ảnh" onClick={() => deleteImage(image.id)}>
-                            <Trash2 className="text-red-600" />
-                          </Button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ))}
+                <div className="min-w-[200px] flex-1">
+                  <p className="text-base font-semibold text-slate-900">{detail.name}</p>
+                  <p className="mt-0.5 text-xs text-slate-500">{detail.short_description || 'Chưa có mô tả ngắn'}</p>
+                </div>
+                <dl className="grid shrink-0 grid-cols-2 gap-x-6 gap-y-1 text-xs">
+                  <dt className="text-slate-500">Giá bán</dt>
+                  <dd className="font-semibold text-brand-700">{fmtVND(detail.base_price)}</dd>
+                  <dt className="text-slate-500">Giá so sánh</dt>
+                  <dd className={detail.compare_at_price ? 'text-slate-700 line-through' : 'text-slate-400'}>{detail.compare_at_price ? fmtVND(detail.compare_at_price) : '—'}</dd>
+                  <dt className="text-slate-500">Trạng thái</dt>
+                  <dd><Badge color={detail.status === 'active' ? 'green' : detail.status === 'archived' ? 'default' : 'gold'}>{t('product', detail.status)}</Badge></dd>
+                  <dt className="text-slate-500">SKU</dt>
+                  <dd className="text-slate-700">{detail.sku || '—'}</dd>
+                </dl>
               </div>
-              {writable && (
-                <div className="mt-2 flex flex-wrap items-center gap-2">
-                  <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 py-1.5 text-sm shadow-sm hover:bg-slate-50">
-                    <Upload className="size-4" />Tải ảnh lên
-                    <input type="file" accept="image/*" className="hidden" onChange={(e) => { if (e.target.files[0]) uploadImage(e.target.files[0]); e.target.value = ''; }} />
-                  </label>
-                  <MediaPicker value={null} onChange={linkImage} kind="image" />
-                </div>
-              )}
+
+              <Section title={`Biến thể (${detail.variants.length})`} cols={1}>
+                {detail.variants.length ? (
+                  <TableWrap>
+                    <table className="w-full text-sm">
+                      <THead><Tr><Th>SKU</Th><Th>Tên</Th><Th className="text-right">Giá</Th><Th className="text-right">Tồn kho</Th><Th>Trạng thái</Th></Tr></THead>
+                      <tbody>
+                        {detail.variants.map((variant) => (
+                          <Tr key={variant.id}>
+                            <Td className="font-mono text-xs">{variant.sku}</Td>
+                            <Td>{variant.name || '—'}</Td>
+                            <Td className="text-right font-medium">{fmtVND(variant.price)}</Td>
+                            <Td className="text-right">{variant.available_qty ?? '—'}</Td>
+                            <Td><Badge color={variant.status === 'active' ? 'green' : 'default'}>{t('variant', variant.status)}</Badge></Td>
+                          </Tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </TableWrap>
+                ) : <p className="text-sm text-slate-400">Sản phẩm chưa có biến thể nào.</p>}
+                {writable && (
+                  <div className="mt-1 flex flex-wrap items-end gap-2">
+                    <Field label="SKU *"><Input placeholder="VD: ATS-DO-M" value={vform.sku || ''} onChange={(e) => setVform((value) => ({ ...value, sku: e.target.value }))} className="w-36" /></Field>
+                    <Field label="Tên biến thể"><Input placeholder="VD: Đỏ / M" value={vform.name || ''} onChange={(e) => setVform((value) => ({ ...value, name: e.target.value }))} className="w-36" /></Field>
+                    <Field label="Giá *"><Input type="number" placeholder="0" min={0} value={vform.price ?? ''} onChange={(e) => setVform((value) => ({ ...value, price: Number(e.target.value) }))} className="w-32" /></Field>
+                    <Button onClick={addVariant}><Plus />Thêm biến thể</Button>
+                  </div>
+                )}
+              </Section>
+
+              <Section title={`Ảnh sản phẩm (${detail.images.length})`} cols={1}>
+                {detail.images.length ? (
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                    {detail.images.map((image) => (
+                      <div key={image.id} className={`overflow-hidden rounded-lg border ${image.is_primary ? 'border-brand-500 ring-1 ring-brand-500' : 'border-slate-200'}`}>
+                        <button onClick={() => viewImage(image)} className="relative block aspect-square w-full bg-slate-50" title="Bấm để xem lớn">
+                          {image.object_key
+                            ? <img src={mediaUrl(image.object_key)} alt={image.alt_text || ''} className="size-full object-contain" loading="lazy" />
+                            : <span className="flex size-full items-center justify-center text-xs text-slate-400">Ảnh #{image.media_id}</span>}
+                          {image.is_primary && <span className="absolute left-1 top-1 rounded bg-brand-600 px-1.5 py-0.5 text-[10px] font-medium text-white">Ảnh chính</span>}
+                        </button>
+                        {writable && (
+                          <div className="space-y-1.5 border-t border-slate-100 p-2">
+                            <Input
+                              placeholder="Chú thích ảnh (alt)"
+                              value={image.alt_text || ''}
+                              onChange={(e) => setDetail((value) => ({ ...value, images: value.images.map((item) => item.id === image.id ? { ...item, alt_text: e.target.value } : item) }))}
+                              onBlur={(e) => updateImage(image.id, { alt_text: e.target.value })}
+                              className="h-8 text-xs"
+                            />
+                            <div className="flex items-center gap-1.5">
+                              <label className="whitespace-nowrap text-[11px] text-slate-500">Thứ tự</label>
+                              <Input
+                                type="number"
+                                min={0}
+                                defaultValue={image.sort_order}
+                                onBlur={(e) => updateImage(image.id, { sort_order: Number(e.target.value) || 0 })}
+                                className="h-8 w-14 text-xs"
+                              />
+                              {!image.is_primary && (
+                                <Button size="sm" variant="outline" title="Đặt làm ảnh chính" onClick={() => updateImage(image.id, { is_primary: true })}>
+                                  <Star /> Chính
+                                </Button>
+                              )}
+                              <Button size="sm" variant="ghost" title="Xóa ảnh" className="ml-auto" onClick={() => deleteImage(image.id)}>
+                                <Trash2 className="text-red-600" />
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : <p className="text-sm text-slate-400">Chưa có ảnh nào. Tải ảnh lên hoặc chọn từ thư viện bên dưới.</p>}
+                {writable && (
+                  <div className="mt-1 flex flex-wrap items-center gap-2">
+                    <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 py-1.5 text-sm shadow-sm hover:bg-slate-50">
+                      <Upload className="size-4" />Tải ảnh lên
+                      <input type="file" accept="image/*" className="hidden" onChange={(e) => { if (e.target.files[0]) uploadImage(e.target.files[0]); e.target.value = ''; }} />
+                    </label>
+                    <MediaPicker value={null} onChange={linkImage} kind="image" />
+                  </div>
+                )}
+              </Section>
             </>
           )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDetail(null)}>Đóng</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
