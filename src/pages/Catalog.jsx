@@ -1,145 +1,608 @@
 import { useEffect, useState } from 'react';
-import { Plus } from 'lucide-react';
+import { Eye, EyeOff, Pencil, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { api, errMsg } from '../api/client';
+import { useAuth } from '../auth/AuthContext';
 import { Button } from '../components/ui/button';
 import { Input, Field } from '../components/ui/input';
 import { Card, CardContent, Badge } from '../components/ui/card';
 import { TableWrap, THead, Tr, Th, Td, Empty, Toolbar } from '../components/ui/table';
-import { Tabs } from '../components/ui/misc';
+import { Tabs, ConfirmDialog, IconButton, RowActions } from '../components/ui/misc';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
 
 const CAT_ICONS = ['bi-bag', 'bi-basket', 'bi-basket3', 'bi-tag', 'bi-tags', 'bi-gift', 'bi-house', 'bi-phone', 'bi-laptop', 'bi-controller', 'bi-headphones', 'bi-watch', 'bi-camera', 'bi-bicycle', 'bi-book', 'bi-pencil', 'bi-brush', 'bi-gem', 'bi-lamp', 'bi-tools', 'bi-heart-pulse', 'bi-cup-straw', 'bi-egg-fried', 'bi-cart', 'bi-star', 'bi-truck', 'bi-ticket-perforated'];
+const inputCls = 'flex h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm shadow-sm';
+const ATTRIBUTE_TYPES = [
+  { value: 'text', label: 'Văn bản' },
+  { value: 'color', label: 'Màu sắc' },
+  { value: 'image', label: 'Hình ảnh' },
+  { value: 'number', label: 'Số' },
+];
+const ATTRIBUTE_TYPE_LABELS = Object.fromEntries(ATTRIBUTE_TYPES.map((item) => [item.value, item.label]));
 
-function Crud({ title, listUrl, createUrl, columns, children, form, onSubmit, open, setOpen }) {
-  const [rows, setRows] = useState([]);
-  const load = (quiet = false) => api.get(listUrl).then((r) => setRows(Array.isArray(r.data) ? r.data : [])).catch((e) => { if (!quiet) toast.error(errMsg(e)); });
-  useEffect(() => { load(); }, []);
-  const save = async () => {
-    try { await api.post(createUrl, form); toast.success('Đã thêm ' + title); setOpen(false); onSubmit(); load(true); }
-    catch (e) { toast.error(errMsg(e)); }
+const categoryPayload = (value = {}) => {
+  const name = (value.name || '').trim();
+  return {
+    parent_id: value.parent_id ? Number(value.parent_id) : null,
+    name,
+    slug: value.slug || name,
+    description: value.description || null,
+    image_media_id: value.image_media_id || null,
+    icon: value.icon || null,
+    sort_order: Number(value.sort_order) || 0,
+    status: value.status || 'active',
   };
+};
+
+const brandPayload = (value = {}) => ({
+  name: (value.name || '').trim(),
+  slug: value.slug || value.name || '',
+  description: value.description || null,
+  logo_media_id: value.logo_media_id || null,
+  status: value.status || 'active',
+});
+
+const attributeValuePayload = (value = {}) => ({
+  value: (value.value || '').trim(),
+  display_value: (value.display_value || '').trim() || null,
+  color_hex: value.color_hex || null,
+  image_media_id: value.image_media_id || null,
+  sort_order: Number(value.sort_order) || 0,
+});
+
+function Crud({ title, listUrl, columns, children, form, setForm, editing, setEditing, open, setOpen, canWrite, buildPayload }) {
+  const [rows, setRows] = useState([]);
+  const [saving, setSaving] = useState(false);
+  const [toggleId, setToggleId] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+
+  const load = (quiet = false) => api.get(listUrl)
+    .then((response) => setRows(Array.isArray(response.data) ? response.data : []))
+    .catch((e) => { if (!quiet) toast.error(errMsg(e)); });
+
+  useEffect(() => { load(); }, []);
+
+  const startCreate = () => {
+    setEditing(null);
+    setForm({});
+    setOpen(true);
+  };
+
+  const startEdit = (row) => {
+    setEditing(row);
+    setForm({ ...row });
+    setOpen(true);
+  };
+
+  const closeDialog = () => {
+    if (saving) return;
+    setOpen(false);
+    setEditing(null);
+    setForm({});
+  };
+
+  const save = async () => {
+    if (!(form.name || '').trim()) return toast.error(`Vui nhập tên ${title}`);
+    setSaving(true);
+    try {
+      if (editing?.id) await api.put(`${listUrl}/${editing.id}`, buildPayload(form));
+      else await api.post(listUrl, buildPayload(form));
+      toast.success(editing?.id ? `Đã cập nhật ${title}` : `Đã thêm ${title}`);
+      setOpen(false);
+      setEditing(null);
+      setForm({});
+      await load(true);
+    } catch (e) {
+      toast.error(errMsg(e));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const toggleStatus = async (row) => {
+    if (toggleId) return;
+    const status = row.status === 'active' ? 'inactive' : 'active';
+    setToggleId(row.id);
+    try {
+      await api.put(`${listUrl}/${row.id}`, buildPayload({ ...row, status }));
+      toast.success(status === 'active' ? 'Đã hiện thị' : 'Đã ẩn');
+      await load(true);
+    } catch (e) {
+      toast.error(errMsg(e));
+    } finally {
+      setToggleId(null);
+    }
+  };
+
+  const remove = async () => {
+    if (!deleteTarget) return;
+    try {
+      await api.delete(`${listUrl}/${deleteTarget.id}`);
+      toast.success(`Đã ẩn ${title}`);
+      await load(true);
+    } catch (e) {
+      toast.error(errMsg(e));
+    }
+  };
+
   return (
     <>
-      <Button onClick={() => setOpen(true)}><Plus />Thêm {title}</Button>
-      <TableWrap><table className="w-full text-sm">
-        <THead><Tr>{columns.map((c) => <Th key={c.key}>{c.title}</Th>)}</Tr></THead>
-        <tbody>{rows.map((r) => <Tr key={r.id}>{columns.map((c) => <Td key={c.key}>{c.render ? c.render(r[c.key], r) : r[c.key]}</Td>)}</Tr>)}</tbody>
-      </table></TableWrap>
+      {canWrite && <Button onClick={startCreate}><Plus />Thêm {title}</Button>}
+      <TableWrap className="mt-3">
+        <table className="w-full text-sm">
+          <THead>
+            <Tr>
+              {columns.map((column) => <Th key={column.key}>{column.title}</Th>)}
+              <Th className="text-right">Thao tác</Th>
+            </Tr>
+          </THead>
+          <tbody>
+            {rows.map((row) => (
+              <Tr key={row.id}>
+                {columns.map((column) => (
+                  <Td key={column.key}>{column.render ? column.render(row[column.key], row) : (row[column.key] ?? '—')}</Td>
+                ))}
+                <Td>
+                  <RowActions>
+                    {canWrite && (
+                      <>
+                        <IconButton
+                          label={row.status === 'active' ? `Ẩn ${title}` : `Hiện thị ${title}`}
+                          onClick={() => toggleStatus(row)}
+                          disabled={toggleId === row.id}
+                        >
+                          {row.status === 'active' ? <Eye /> : <EyeOff />}
+                        </IconButton>
+                        <IconButton label={`Sửa ${title}`} onClick={() => startEdit(row)}>
+                          <Pencil />
+                        </IconButton>
+                        <IconButton label={`Xóa ${title}`} onClick={() => setDeleteTarget(row)}>
+                          <Trash2 className="text-red-600" />
+                        </IconButton>
+                      </>
+                    )}
+                  </RowActions>
+                </Td>
+              </Tr>
+            ))}
+          </tbody>
+        </table>
+      </TableWrap>
       {!rows.length && <Empty />}
-      <Dialog open={open} onOpenChange={setOpen}>
+
+      <Dialog open={open} onOpenChange={(next) => !next && closeDialog()}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Thêm {title}</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle>{editing?.id ? `Sửa ${title}` : `Thêm ${title}`}</DialogTitle>
+          </DialogHeader>
           {children}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setOpen(false)}>Hủy</Button>
-            <Button onClick={save}>Lưu</Button>
+            <Button variant="outline" disabled={saving} onClick={closeDialog}>Hủy</Button>
+            <Button disabled={saving} onClick={save}>
+              {saving ? 'Đang lưu...' : editing?.id ? 'Lưu thay đổi' : 'Thêm'}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={(next) => !next && setDeleteTarget(null)}
+        title={`Xóa ${title}`}
+        description={`Thao tác này sẽ ẩn ${title} khỏi danh sách, vẫn giữ dữ liệu.`}
+        confirmText="Ẩn"
+        onConfirm={remove}
+      />
     </>
   );
 }
 
 export default function Catalog() {
+  const { can } = useAuth();
+  const canWriteCategories = can('categories.write');
+  const canWriteProducts = can('products.write');
   const [tab, setTab] = useState('cat');
   const [catOpen, setCatOpen] = useState(false);
-  const [brandOpen, setBrandOpen] = useState(false);
+  const [catEditing, setCatEditing] = useState(null);
   const [catForm, setCatForm] = useState({});
+  const [brandOpen, setBrandOpen] = useState(false);
+  const [brandEditing, setBrandEditing] = useState(null);
   const [brandForm, setBrandForm] = useState({});
   const [attrs, setAttrs] = useState([]);
-  const [attr, setAttr] = useState({ name: '', code: '' });
   const [attrId, setAttrId] = useState('');
+  const [attrOpen, setAttrOpen] = useState(false);
+  const [attrEditing, setAttrEditing] = useState(null);
+  const [attrForm, setAttrForm] = useState({ name: '', code: '', display_type: 'text', sort_order: 0 });
+  const [attrDelete, setAttrDelete] = useState(null);
+  const [savingAttr, setSavingAttr] = useState(false);
   const [valForm, setValForm] = useState({});
+  const [savingVal, setSavingVal] = useState(false);
+  const [valueEditing, setValueEditing] = useState(null);
+  const [valueForm, setValueForm] = useState({});
+  const [savingValueEdit, setSavingValueEdit] = useState(false);
+  const [valueDelete, setValueDelete] = useState(null);
 
-  const loadAttrs = () => api.get('/attributes').then((r) => setAttrs(r.data)).catch(() => {});
+  const loadAttrs = (quiet = false) => api.get('/attributes')
+    .then((response) => setAttrs(Array.isArray(response.data) ? response.data : []))
+    .catch((e) => { if (!quiet) toast.error(errMsg(e)); });
+
   useEffect(() => { loadAttrs(); }, []);
 
-  const saveAttr = async () => {
-    if (!attr.name || !attr.code) return toast.error('Nhập tên và mã');
-    try { await api.post('/attributes', attr); toast.success('Đã thêm thuộc tính'); setAttr({ name: '', code: '' }); loadAttrs(); }
-    catch (e) { toast.error(errMsg(e)); }
+  const startAttrCreate = () => {
+    setAttrEditing(null);
+    setAttrForm({ name: '', code: '', display_type: 'text', sort_order: 0 });
+    setAttrOpen(true);
   };
+
+  const startAttrEdit = (attribute) => {
+    setAttrEditing(attribute);
+    setAttrForm({
+      name: attribute.name || '',
+      code: attribute.code || '',
+      display_type: attribute.display_type || 'text',
+      sort_order: attribute.sort_order ?? 0,
+    });
+    setAttrOpen(true);
+  };
+
+  const closeAttrDialog = () => {
+    if (savingAttr) return;
+    setAttrOpen(false);
+    setAttrEditing(null);
+  };
+
+  const saveAttr = async () => {
+    if (!attrForm.name.trim() || !attrForm.code.trim()) return toast.error('Vui nhập tên và mã thuộc tính');
+    setSavingAttr(true);
+    const payload = {
+      name: attrForm.name.trim(),
+      code: attrForm.code.trim(),
+      display_type: attrForm.display_type || 'text',
+      sort_order: Number(attrForm.sort_order) || 0,
+    };
+    try {
+      if (attrEditing?.id) await api.put(`/attributes/${attrEditing.id}`, payload);
+      else await api.post('/attributes', payload);
+      toast.success(attrEditing?.id ? 'Đã cập nhật thuộc tính' : 'Đã thêm thuộc tính');
+      setAttrOpen(false);
+      setAttrEditing(null);
+      await loadAttrs(true);
+    } catch (e) {
+      toast.error(errMsg(e));
+    } finally {
+      setSavingAttr(false);
+    }
+  };
+
+  const removeAttr = async () => {
+    if (!attrDelete) return;
+    try {
+      await api.delete(`/attributes/${attrDelete.id}`);
+      toast.success('Đã xóa thuộc tính và các giá trị liên quan');
+      if (String(attrId) === String(attrDelete.id)) setAttrId('');
+      await loadAttrs(true);
+    } catch (e) {
+      toast.error(errMsg(e));
+    }
+  };
+
   const saveAttrValue = async () => {
-    if (!attrId) return toast.warning('Chọn thuộc tính trước');
-    if (!valForm.value) return toast.error('Nhập giá trị');
-    try { await api.post(`/attributes/${attrId}/values`, valForm); toast.success('Đã thêm giá trị'); setValForm({}); loadAttrs(); }
-    catch (e) { toast.error(errMsg(e)); }
+    if (!attrId) return toast.warning('Vui chọn thuộc tính trước');
+    if (!(valForm.value || '').trim()) return toast.error('Vui nhập giá trị');
+    setSavingVal(true);
+    try {
+      await api.post(`/attributes/${attrId}/values`, attributeValuePayload(valForm));
+      toast.success('Đã thêm giá trị');
+      setValForm({});
+      await loadAttrs(true);
+    } catch (e) {
+      toast.error(errMsg(e));
+    } finally {
+      setSavingVal(false);
+    }
+  };
+
+  const startValueEdit = (attribute, value) => {
+    setValueEditing({ attribute, value });
+    setValueForm({
+      value: value.value || '',
+      display_value: value.display_value || '',
+      color_hex: value.color_hex || '',
+      image_media_id: value.image_media_id || null,
+      sort_order: value.sort_order ?? 0,
+    });
+  };
+
+  const closeValueDialog = () => {
+    if (savingValueEdit) return;
+    setValueEditing(null);
+    setValueForm({});
+  };
+
+  const saveValueEdit = async () => {
+    if (!valueEditing?.value?.id) return;
+    if (!(valueForm.value || '').trim()) return toast.error('Vui nhập giá trị');
+    setSavingValueEdit(true);
+    try {
+      await api.put(`/attribute-values/${valueEditing.value.id}`, attributeValuePayload(valueForm));
+      toast.success('Đã cập nhật giá trị');
+      setValueEditing(null);
+      setValueForm({});
+      await loadAttrs(true);
+    } catch (e) {
+      toast.error(errMsg(e));
+    } finally {
+      setSavingValueEdit(false);
+    }
+  };
+
+  const removeValue = async () => {
+    if (!valueDelete) return;
+    try {
+      await api.delete(`/attribute-values/${valueDelete.value.id}`);
+      toast.success('Đã xóa giá trị');
+      await loadAttrs(true);
+    } catch (e) {
+      toast.error(errMsg(e));
+    }
   };
 
   return (
     <div>
       <h1 className="mb-4 text-xl font-semibold tracking-tight">Danh mục & Thương hiệu</h1>
-      <Card><CardContent className="pt-4">
-        <Tabs active={tab} onChange={setTab} tabs={[
-          { key: 'cat', label: 'Danh mục' }, { key: 'brand', label: 'Thương hiệu' }, { key: 'attr', label: 'Thuộc tính' },
-        ]} />
-        {tab === 'cat' && (
-          <Crud title="danh mục" listUrl="/categories" createUrl="/categories" open={catOpen} setOpen={setCatOpen} form={catForm} onSubmit={() => setCatForm({})}
-            columns={[
-              { key: 'id', title: 'ID' },
-              { key: 'icon', title: 'Icon', render: (v) => (v ? <i className={`bi ${v}`} style={{ fontSize: 18, color: '#0f4c81' }}></i> : '—') },
-              { key: 'name', title: 'Tên' }, { key: 'slug', title: 'Đường dẫn' },
-              { key: 'parent_id', title: 'Cha' }, { key: 'sort_order', title: 'Sắp xếp' },
-              { key: 'status', title: 'Trạng thái', render: (v) => <Badge color={v === 'active' ? 'green' : 'default'}>{v === 'active' ? 'Đang hiện' : 'Đã ẩn'}</Badge> },
-            ]}>
-            <div className="grid gap-3">
-              <Field label="Tên *"><Input value={catForm.name || ''} onChange={(e) => setCatForm({ ...catForm, name: e.target.value })} /></Field>
-              <Field label="Icon hiển thị ở web">
-                <div className="flex items-center gap-2">
-                  <select value={catForm.icon || ''} onChange={(e) => setCatForm({ ...catForm, icon: e.target.value || null })}
-                    className="flex h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm shadow-sm">
-                    <option value="">Không dùng icon</option>
-                    {CAT_ICONS.map((ic) => <option key={ic} value={ic}>{ic}</option>)}
-                  </select>
-                  {catForm.icon && <i className={`bi ${catForm.icon}`} style={{ fontSize: 24, color: '#0f4c81' }}></i>}
+      <Card>
+        <CardContent className="pt-4">
+          <Tabs active={tab} onChange={setTab} tabs={[
+            { key: 'cat', label: 'Danh mục' },
+            { key: 'brand', label: 'Thương hiệu' },
+            { key: 'attr', label: 'Thuộc tính' },
+          ]} />
+
+          {tab === 'cat' && (
+            <Crud
+              title="danh mục"
+              listUrl="/categories"
+              open={catOpen}
+              setOpen={setCatOpen}
+              editing={catEditing}
+              setEditing={setCatEditing}
+              form={catForm}
+              setForm={setCatForm}
+              canWrite={canWriteCategories}
+              buildPayload={categoryPayload}
+              columns={[
+                { key: 'id', title: 'ID' },
+                { key: 'icon', title: 'Biểu tượng', render: (value) => value ? <i className={`bi ${value}`} style={{ fontSize: 18, color: '#0f4c81' }}></i> : '—' },
+                { key: 'name', title: 'Tên' },
+                { key: 'slug', title: 'Đường dẫn' },
+                { key: 'parent_id', title: 'Danh mục cha' },
+                { key: 'sort_order', title: 'Sắp xếp' },
+                { key: 'status', title: 'Trạng thái', render: (value) => <Badge color={value === 'active' ? 'green' : 'default'}>{value === 'active' ? 'Đang hiện' : 'Đang ẩn'}</Badge> },
+              ]}
+            >
+              <div className="grid gap-3">
+                <Field label="Tên *">
+                  <Input value={catForm.name || ''} onChange={(e) => setCatForm((value) => ({ ...value, name: e.target.value }))} />
+                </Field>
+                <Field label="Biểu tượng hiển thị ở website">
+                  <div className="flex items-center gap-2">
+                    <select
+                      className={inputCls}
+                      value={catForm.icon || ''}
+                      onChange={(e) => setCatForm((value) => ({ ...value, icon: e.target.value || null }))}
+                    >
+                      <option value="">Không dùng biểu tượng</option>
+                      {CAT_ICONS.map((icon) => <option key={icon} value={icon}>{icon}</option>)}
+                    </select>
+                    {catForm.icon && <i className={`bi ${catForm.icon}`} style={{ fontSize: 24, color: '#0f4c81' }}></i>}
+                  </div>
+                </Field>
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="Danh mục cha (ID)">
+                    <Input type="number" value={catForm.parent_id || ''} onChange={(e) => setCatForm((value) => ({ ...value, parent_id: Number(e.target.value) || null }))} />
+                  </Field>
+                  <Field label="Sắp xếp">
+                    <Input type="number" value={catForm.sort_order ?? 0} onChange={(e) => setCatForm((value) => ({ ...value, sort_order: Number(e.target.value) || 0 }))} />
+                  </Field>
                 </div>
+                <Field label="Trạng thái">
+                  <select className={inputCls} value={catForm.status || 'active'} onChange={(e) => setCatForm((value) => ({ ...value, status: e.target.value }))}>
+                    <option value="active">Đang hiện</option>
+                    <option value="inactive">Đang ẩn</option>
+                  </select>
+                </Field>
+              </div>
+            </Crud>
+          )}
+
+          {tab === 'brand' && (
+            <Crud
+              title="thương hiệu"
+              listUrl="/brands"
+              open={brandOpen}
+              setOpen={setBrandOpen}
+              editing={brandEditing}
+              setEditing={setBrandEditing}
+              form={brandForm}
+              setForm={setBrandForm}
+              canWrite={canWriteProducts}
+              buildPayload={brandPayload}
+              columns={[
+                { key: 'id', title: 'ID' },
+                { key: 'name', title: 'Tên' },
+                { key: 'slug', title: 'Đường dẫn' },
+                { key: 'status', title: 'Trạng thái', render: (value) => <Badge color={value === 'active' ? 'green' : 'default'}>{value === 'active' ? 'Đang hiện' : 'Đang ẩn'}</Badge> },
+              ]}
+            >
+              <div className="grid gap-3">
+                <Field label="Tên *">
+                  <Input value={brandForm.name || ''} onChange={(e) => setBrandForm((value) => ({ ...value, name: e.target.value }))} />
+                </Field>
+                <Field label="Mô tả">
+                  <Input value={brandForm.description || ''} onChange={(e) => setBrandForm((value) => ({ ...value, description: e.target.value }))} />
+                </Field>
+                <Field label="Trạng thái">
+                  <select className={inputCls} value={brandForm.status || 'active'} onChange={(e) => setBrandForm((value) => ({ ...value, status: e.target.value }))}>
+                    <option value="active">Đang hiện</option>
+                    <option value="inactive">Đang ẩn</option>
+                  </select>
+                </Field>
+              </div>
+            </Crud>
+          )}
+
+          {tab === 'attr' && (
+            <>
+              {canWriteProducts && <Button onClick={startAttrCreate}><Plus />Thêm thuộc tính</Button>}
+              <TableWrap className="mt-3">
+                <table className="w-full text-sm">
+                  <THead>
+                    <Tr>
+                      <Th>Tên</Th>
+                      <Th>Mã</Th>
+                      <Th>Kiểu hiển thị</Th>
+                      <Th>Giá trị</Th>
+                      <Th className="text-right">Thao tác</Th>
+                    </Tr>
+                  </THead>
+                  <tbody>
+                    {attrs.map((attribute) => (
+                      <Tr key={attribute.id}>
+                        <Td className="font-medium">{attribute.name}</Td>
+                        <Td><Badge>{attribute.code}</Badge></Td>
+                        <Td>{ATTRIBUTE_TYPE_LABELS[attribute.display_type] || 'Văn bản'}</Td>
+                        <Td>
+                          <div className="flex flex-wrap items-center gap-2">
+                            {(attribute.values || []).map((value) => (
+                              <span key={value.id} className="inline-flex items-center gap-1 rounded-md border border-slate-200">
+                                <Badge>{value.display_value || value.value}</Badge>
+                                {canWriteProducts && (
+                                  <RowActions>
+                                    <IconButton label="Sửa giá trị" onClick={() => startValueEdit(attribute, value)}>
+                                      <Pencil />
+                                    </IconButton>
+                                    <IconButton label="Xóa giá trị" onClick={() => setValueDelete({ attribute, value })}>
+                                      <Trash2 className="text-red-600" />
+                                    </IconButton>
+                                  </RowActions>
+                                )}
+                              </span>
+                            ))}
+                            {!attribute.values?.length && '—'}
+                          </div>
+                        </Td>
+                        <Td>
+                          <RowActions>
+                            {canWriteProducts && (
+                              <>
+                                <IconButton label="Sửa thuộc tính" onClick={() => startAttrEdit(attribute)}>
+                                  <Pencil />
+                                </IconButton>
+                                <IconButton label="Xóa thuộc tính" onClick={() => setAttrDelete(attribute)}>
+                                  <Trash2 className="text-red-600" />
+                                </IconButton>
+                              </>
+                            )}
+                          </RowActions>
+                        </Td>
+                      </Tr>
+                    ))}
+                  </tbody>
+                </table>
+              </TableWrap>
+              {!attrs.length && <Empty />}
+
+              {canWriteProducts && (
+                <div className="mt-3">
+                  <Toolbar>
+                    <select value={attrId} onChange={(e) => setAttrId(e.target.value)} className={inputCls}>
+                      <option value="">Chọn thuộc tính...</option>
+                      {attrs.map((attribute) => <option key={attribute.id} value={attribute.id}>{attribute.name}</option>)}
+                    </select>
+                    <Input placeholder="Giá trị (M...)" value={valForm.value || ''} className="max-w-[160px]" onChange={(e) => setValForm((value) => ({ ...value, value: e.target.value }))} />
+                    <Input placeholder="Tên hiển thị" value={valForm.display_value || ''} className="max-w-[160px]" onChange={(e) => setValForm((value) => ({ ...value, display_value: e.target.value }))} />
+                    <Button disabled={savingVal} onClick={saveAttrValue}>{savingVal ? 'Đang lưu...' : 'Thêm giá trị'}</Button>
+                  </Toolbar>
+                </div>
+              )}
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      <Dialog open={attrOpen} onOpenChange={(next) => !next && closeAttrDialog()}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{attrEditing?.id ? 'Sửa thuộc tính' : 'Thêm thuộc tính'}</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-3">
+            <Field label="Tên *">
+              <Input value={attrForm.name} onChange={(e) => setAttrForm((value) => ({ ...value, name: e.target.value }))} />
+            </Field>
+            <Field label="Mã *">
+              <Input value={attrForm.code} onChange={(e) => setAttrForm((value) => ({ ...value, code: e.target.value }))} />
+            </Field>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Kiểu hiển thị">
+                <select className={inputCls} value={attrForm.display_type} onChange={(e) => setAttrForm((value) => ({ ...value, display_type: e.target.value }))}>
+                  {ATTRIBUTE_TYPES.map((type) => <option key={type.value} value={type.value}>{type.label}</option>)}
+                </select>
               </Field>
-              <div className="grid grid-cols-2 gap-3">
-                <Field label="Danh mục cha (ID)"><Input type="number" value={catForm.parent_id || ''} onChange={(e) => setCatForm({ ...catForm, parent_id: Number(e.target.value) || null })} /></Field>
-                <Field label="Sắp xếp"><Input type="number" value={catForm.sort_order || ''} onChange={(e) => setCatForm({ ...catForm, sort_order: Number(e.target.value) || 0 })} /></Field>
-              </div>
+              <Field label="Sắp xếp">
+                <Input type="number" value={attrForm.sort_order ?? 0} onChange={(e) => setAttrForm((value) => ({ ...value, sort_order: Number(e.target.value) || 0 }))} />
+              </Field>
             </div>
-          </Crud>
-        )}
-        {tab === 'brand' && (
-          <Crud title="thương hiệu" listUrl="/brands" createUrl="/brands" open={brandOpen} setOpen={setBrandOpen} form={brandForm} onSubmit={() => setBrandForm({})}
-            columns={[
-              { key: 'id', title: 'ID' }, { key: 'name', title: 'Tên' }, { key: 'slug', title: 'Đường dẫn' },
-              { key: 'status', title: 'Trạng thái', render: (v) => <Badge color={v === 'active' ? 'green' : 'default'}>{v === 'active' ? 'Hoạt động' : 'Ngừng'}</Badge> },
-            ]}>
-            <div className="grid gap-3">
-              <Field label="Tên *"><Input value={brandForm.name || ''} onChange={(e) => setBrandForm({ ...brandForm, name: e.target.value })} /></Field>
-              <Field label="Mô tả"><Input value={brandForm.description || ''} onChange={(e) => setBrandForm({ ...brandForm, description: e.target.value })} /></Field>
-            </div>
-          </Crud>
-        )}
-        {tab === 'attr' && (<>
-          <Toolbar>
-            <Input placeholder="Tên thuộc tính (Màu sắc...)" value={attr.name} className="max-w-[200px]" onChange={(e) => setAttr({ ...attr, name: e.target.value })} />
-            <Input placeholder="Mã (color...)" value={attr.code} className="max-w-[160px]" onChange={(e) => setAttr({ ...attr, code: e.target.value })} />
-            <Button onClick={saveAttr}><Plus />Thêm thuộc tính</Button>
-          </Toolbar>
-          {attrs.map((a) => (
-            <div key={a.id} className="mb-2 rounded-lg border px-3 py-2 text-sm">
-              <b>{a.name}</b> <Badge>{a.code}</Badge>
-              <div className="mt-1 flex flex-wrap gap-1.5">
-                {(a.values || []).map((v) => <Badge key={v.id}>{v.display_value || v.value}</Badge>)}
-              </div>
-            </div>
-          ))}
-          <div className="mt-3 flex flex-wrap gap-2">
-            <select value={attrId} onChange={(e) => setAttrId(e.target.value)}
-              className="flex h-9 rounded-lg border border-slate-200 bg-white px-3 text-sm">
-              <option value="">Chọn thuộc tính...</option>
-              {attrs.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-            </select>
-            <Input placeholder="Giá trị (M...)" value={valForm.value || ''} className="max-w-[160px]" onChange={(e) => setValForm({ ...valForm, value: e.target.value })} />
-            <Input placeholder="Tên hiển thị" value={valForm.display_value || ''} className="max-w-[160px]" onChange={(e) => setValForm({ ...valForm, display_value: e.target.value })} />
-            <Button variant="outline" onClick={saveAttrValue}>Thêm giá trị</Button>
           </div>
-        </>)}
-      </CardContent></Card>
+          <DialogFooter>
+            <Button variant="outline" disabled={savingAttr} onClick={closeAttrDialog}>Hủy</Button>
+            <Button disabled={savingAttr} onClick={saveAttr}>{savingAttr ? 'Đang lưu...' : attrEditing?.id ? 'Lưu thay đổi' : 'Thêm'}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!valueEditing} onOpenChange={(next) => !next && closeValueDialog()}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Sửa giá trị thuộc tính</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-3">
+            <Field label="Giá trị *">
+              <Input value={valueForm.value || ''} onChange={(e) => setValueForm((value) => ({ ...value, value: e.target.value }))} />
+            </Field>
+            <Field label="Tên hiển thị">
+              <Input value={valueForm.display_value || ''} onChange={(e) => setValueForm((value) => ({ ...value, display_value: e.target.value }))} />
+            </Field>
+            {valueEditing?.attribute.display_type === 'color' && (
+              <Field label="Mã màu">
+                <Input value={valueForm.color_hex || ''} placeholder="#RRGGBB" onChange={(e) => setValueForm((value) => ({ ...value, color_hex: e.target.value }))} />
+              </Field>
+            )}
+            <Field label="Sắp xếp">
+              <Input type="number" value={valueForm.sort_order ?? 0} onChange={(e) => setValueForm((value) => ({ ...value, sort_order: Number(e.target.value) || 0 }))} />
+            </Field>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" disabled={savingValueEdit} onClick={closeValueDialog}>Hủy</Button>
+            <Button disabled={savingValueEdit} onClick={saveValueEdit}>{savingValueEdit ? 'Đang lưu...' : 'Lưu thay đổi'}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <ConfirmDialog
+        open={!!attrDelete}
+        onOpenChange={(next) => !next && setAttrDelete(null)}
+        title="Xóa thuộc tính"
+        description="Xóa vĩnh viễn thuộc tính này cùng toàn bộ giá trị và các lựa chọn biến thể đang được gắn."
+        onConfirm={removeAttr}
+      />
+
+      <ConfirmDialog
+        open={!!valueDelete}
+        onOpenChange={(next) => !next && setValueDelete(null)}
+        title="Xóa giá trị"
+        description={`Xóa vĩnh viễn giá trị “${valueDelete?.value.display_value || valueDelete?.value.value || ''}” và gỡ nó khỏi mọi biến thể sản phẩm đang sử dụng.`}
+        onConfirm={removeValue}
+      />
     </div>
   );
 }

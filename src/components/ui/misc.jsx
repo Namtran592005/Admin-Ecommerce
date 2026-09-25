@@ -2,6 +2,7 @@ import * as React from 'react';
 import { cn } from '../../lib/utils';
 import { Badge } from './card';
 import { Button } from './button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from './dialog';
 import { t } from '../../utils/status';
 
 const COLOR = {
@@ -54,3 +55,49 @@ export const ConfirmButton = ({ title, onConfirm, children, ...props }) => {
     </span>
   );
 };
+
+export const ConfirmDialog = ({ open, onOpenChange, title, description, confirmText = 'Xóa', onConfirm, busy, tone = 'danger' }) => {
+  const [running, setRunning] = React.useState(false);
+  const run = async () => {
+    setRunning(true);
+    try { await onConfirm(); onOpenChange(false); } finally { setRunning(false); }
+  };
+  return (
+    <Dialog open={open} onOpenChange={(v) => !running && onOpenChange(v)}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+        </DialogHeader>
+        {description && <p className="text-sm text-slate-600">{description}</p>}
+        <DialogFooter>
+          <Button variant="outline" disabled={running} onClick={() => onOpenChange(false)}>Hủy</Button>
+          <Button
+            variant={tone === 'danger' ? 'destructive' : 'default'}
+            disabled={running || busy}
+            onClick={run}
+          >
+            {running ? 'Đang xử lý...' : confirmText}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+export const RowActions = ({ children }) => (
+  <div className="flex items-center justify-end gap-1">{children}</div>
+);
+
+export const IconButton = ({ label, onClick, children, disabled }) => (
+  <Button
+    size="sm"
+    variant="ghost"
+    title={label}
+    aria-label={label}
+    disabled={disabled}
+    onClick={onClick}
+    className="h-8 w-8 p-0"
+  >
+    {children}
+  </Button>
+);

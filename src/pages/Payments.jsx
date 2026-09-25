@@ -1,18 +1,28 @@
 import { useEffect, useState } from 'react';
-import { Plus, Eye } from 'lucide-react';
+import { Eye, EyeOff, Pencil, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { api, errMsg, fmtVND, fmtDate } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import { t, opts } from '../utils/status';
 import { Button } from '../components/ui/button';
-import { Input, Field } from '../components/ui/input';
+import { Input, Field, Select } from '../components/ui/input';
 import { Card, CardContent, Badge } from '../components/ui/card';
 import { TableWrap, THead, Tr, Th, Td, Empty, PageHeader } from '../components/ui/table';
-import { Tabs, StatusBadge } from '../components/ui/misc';
+import { Tabs, ConfirmDialog, IconButton, RowActions, StatusBadge } from '../components/ui/misc';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
 import { OrderPicker } from '../components/pickers';
 
-const inputCls = 'flex h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm shadow-sm';
+const PAYMENT_TYPES = ['cod', 'bank_transfer', 'gateway', 'card', 'wallet', 'other'];
+const isActive = (value) => Number(value) === 1;
+const methodPayload = (value = {}) => ({
+  code: value.code || '',
+  name: value.name || '',
+  provider: value.provider || null,
+  type: value.type || 'other',
+  is_active: isActive(value.is_active),
+  sort_order: Number(value.sort_order) || 0,
+  config: value.config ?? null,
+});
 
 export default function Payments() {
   const { can } = useAuth();
@@ -26,6 +36,14 @@ export default function Payments() {
   const [refOrder, setRefOrder] = useState(null);
   const [amount, setAmount] = useState('');
   const [reason, setReason] = useState('');
+  const [refundSaving, setRefundSaving] = useState(false);
+  const [methodOpen, setMethodOpen] = useState(false);
+  const [methodEditing, setMethodEditing] = useState(null);
+  const [methodForm, setMethodForm] = useState({});
+  const [methodSaving, setMethodSaving] = useState(false);
+  const [methodToggleId, setMethodToggleId] = useState(null);
+  const [methodDeleteTarget, setMethodDeleteTarget] = useState(null);
+  const [methodForceDeleteTarget, setMethodForceDeleteTarget] = useState(null);
 
   const load = (quiet = false) => {
     api.get('/payments').then((r) => setPays(r.data)).catch((e) => { if (!quiet) toast.error(errMsg(e)); });
@@ -39,22 +57,140 @@ export default function Payments() {
   }, []);
 
   const open = async (id) => {
-    try { const { data } = await api.get(`/payments/${id}`); setSel(data); }
-    catch (e) { toast.error(errMsg(e)); }
+    try {
+      const { data } = await api.get(`/payments/${id}`);
+      setSel(data);
+    } catch (e) {
+      toast.error(errMsg(e));
+    }
   };
   const markPaid = async (id) => {
-    try { await api.post(`/payments/${id}/mark-paid`); toast.success('Đã gạch đã thu'); load(true); setSel(null); }
-    catch (e) { toast.error(errMsg(e)); }
+    try {
+      await api.post(`/payments/${id}/mark-paid`);
+      toast.success('Đã gạch đã thu');
+      load(true);
+      setSel(null);
+    } catch (e) {
+      toast.error(errMsg(e));
+    }
   };
   const createRefund = async () => {
     if (!refOrder) return toast.warning('Chọn đơn hàng');
     if (!amount) return toast.error('Nhập số tiền');
-    try { await api.post('/payments/refunds', { order_id: refOrder, amount: Number(amount), reason }); toast.success('Đã tạo yêu cầu hoàn tiền'); setRefOpen(false); setAmount(''); setReason(''); setRefOrder(null); load(true); }
-    catch (e) { toast.error(errMsg(e)); }
+    setRefundSaving(true);
+    try {
+      await api.post('/payments/refunds', { order_id: refOrder, amount: Number(amount), reason });
+      toast.success('Đã tạo yêu cầu hoàn tiền');
+      setRefOpen(false);
+      setAmount('');
+      setReason('');
+      setRefOrder(null);
+      load(true);
+    } catch (e) {
+      toast.error(errMsg(e));
+    } finally {
+      setRefundSaving(false);
+    }
   };
   const refundStatus = async (id, status) => {
-    try { await api.patch(`/payments/refunds/${id}/status`, { status }); toast.success('Đã cập nhật'); load(true); }
-    catch (e) { toast.error(errMsg(e)); }
+    try {
+      await api.patch(`/payments/refunds/${id}/status`, { status });
+      toast.success('Đã cập nhật');
+      load(true);
+    } catch (e) {
+      toast.error(errMsg(e));
+    }
+  };
+
+  const startMethodCreate = () => {
+    setMethodEditing(null);
+    setMethodForm({ type: 'cod', is_active: true, sort_order: 0, config: null });
+    setMethodOpen(true);
+  };
+  const startMethodEdit = (row) => {
+    setMethodEditing(row);
+    setMethodForm({
+      code: row.code || '',
+      name: row.name || '',
+      provider: row.provider || '',
+      type: row.type || 'other',
+      is_active: isActive(row.is_active),
+      sort_order: Number(row.sort_order) || 0,
+      config: row.config ?? null,
+    });
+    setMethodOpen(true);
+  };
+  const closeMethodDialog = () => {
+    if (methodSaving) return;
+    setMethodOpen(false);
+    setMethodEditing(null);
+    setMethodForm({});
+  };
+  const handleMethodOpenChange = (open) => {
+    if (open) setMethodOpen(true);
+    else closeMethodDialog();
+  };
+  const saveMethod = async () => {
+    if (!methodForm.code?.trim() || !methodForm.name?.trim() || !methodForm.type) return toast.error('Nhập mã, tên và loại phương thức');
+    setMethodSaving(true);
+    try {
+      const payload = methodPayload(methodForm);
+      if (methodEditing?.id) await api.put(`/payments/methods/${methodEditing.id}`, payload);
+      else await api.post('/payments/methods', payload);
+      toast.success(methodEditing?.id ? 'Đã cập nhật phương thức' : 'Đã thêm phương thức');
+      setMethodOpen(false);
+      setMethodEditing(null);
+      setMethodForm({});
+      load(true);
+    } catch (e) {
+      toast.error(errMsg(e));
+    } finally {
+      setMethodSaving(false);
+    }
+  };
+  const toggleMethod = async (row) => {
+    if (methodToggleId !== null) return;
+    const nextActive = !isActive(row.is_active);
+    setMethodToggleId(row.id);
+    try {
+      await api.patch(`/payments/methods/${row.id}/toggle`);
+      toast.success(nextActive ? 'Đã bật' : 'Đã tắt');
+      load(true);
+    } catch (e) {
+      toast.error(errMsg(e));
+    } finally {
+      setMethodToggleId(null);
+    }
+  };
+  const removeMethod = async () => {
+    const target = methodDeleteTarget;
+    if (!target) return;
+    try {
+      await api.delete(`/payments/methods/${target.id}`);
+      toast.success('Đã xóa phương thức');
+      setMethodDeleteTarget(null);
+      load(true);
+    } catch (e) {
+      if (e.response?.status === 409 && e.response?.data?.can_force) {
+        toast.warning(errMsg(e));
+        setMethodDeleteTarget(null);
+        setMethodForceDeleteTarget({ ...target, paymentCount: Number(e.response.data.payment_count) || 0 });
+      } else {
+        toast.error(errMsg(e));
+      }
+    }
+  };
+  const forceRemoveMethod = async () => {
+    const target = methodForceDeleteTarget;
+    if (!target) return;
+    try {
+      await api.delete(`/payments/methods/${target.id}?force=1`);
+      toast.success('Đã xóa phương thức');
+      setMethodForceDeleteTarget(null);
+      load(true);
+    } catch (e) {
+      toast.error(errMsg(e));
+    }
   };
 
   return (
@@ -87,7 +223,7 @@ export default function Payments() {
             <tbody>{refs.map((r) => (
               <Tr key={r.id}>
                 <Td>{r.refund_number}</Td><Td>{r.order_id}</Td><Td>{fmtVND(r.amount)}</Td><Td>{r.reason}</Td>
-                <Td><StatusBadge group="refund" value={r.status} /></Td>
+                <Td><StatusBadge group="payment" value={t('refund', r.status)} /></Td>
                 <Td>{writable && (
                   <select className="h-8 rounded-lg border border-slate-200 bg-white px-2 text-xs" value={r.status}
                     onChange={(e) => refundStatus(r.id, e.target.value)}>
@@ -99,14 +235,26 @@ export default function Payments() {
           </table></TableWrap>
           {!refs.length && <Empty />}</>
         )}
-        {tab === 'm' && (
+        {tab === 'm' && (<>
+          {writable && <div className="mb-3"><Button onClick={startMethodCreate}><Plus />Thêm phương thức</Button></div>}
           <TableWrap><table className="w-full text-sm">
-            <THead><Tr><Th>Mã</Th><Th>Tên</Th><Th>Loại</Th><Th>Bật</Th></Tr></THead>
-            <tbody>{methods.map((m) => <Tr key={m.id}><Td>{m.code}</Td><Td>{m.name}</Td>
+            <THead><Tr><Th>Mã</Th><Th>Tên</Th><Th>Nhà cung cấp</Th><Th>Loại</Th><Th>Thứ tự</Th><Th>Trạng thái</Th><Th className="text-right">Thao tác</Th></Tr></THead>
+            <tbody>{methods.map((m) => <Tr key={m.id}>
+              <Td>{m.code}</Td><Td>{m.name}</Td><Td>{m.provider || '—'}</Td>
               <Td><Badge>{t('paymethod', m.type)}</Badge></Td>
-              <Td><Badge color={m.is_active ? 'green' : 'default'}>{m.is_active ? 'Có' : 'Không'}</Badge></Td></Tr>)}</tbody>
+              <Td>{m.sort_order ?? 0}</Td>
+              <Td><Badge color={isActive(m.is_active) ? 'green' : 'default'}>{isActive(m.is_active) ? 'Đang bật' : 'Đang tắt'}</Badge></Td>
+              <Td><RowActions>{writable && (<>
+                <IconButton label={isActive(m.is_active) ? 'Tắt phương thức' : 'Bật phương thức'} onClick={() => toggleMethod(m)} disabled={methodToggleId === m.id}>
+                  {isActive(m.is_active) ? <EyeOff /> : <Eye />}
+                </IconButton>
+                <IconButton label="Sửa phương thức" onClick={() => startMethodEdit(m)}><Pencil /></IconButton>
+                <IconButton label="Xóa phương thức" onClick={() => setMethodDeleteTarget(m)}><Trash2 className="text-red-600" /></IconButton>
+              </>)}</RowActions></Td>
+            </Tr>)}</tbody>
           </table></TableWrap>
-        )}
+          {!methods.length && <Empty />}
+        </>)}
       </CardContent></Card>
 
       <Dialog open={!!sel} onOpenChange={(o) => !o && setSel(null)}>
@@ -125,6 +273,7 @@ export default function Payments() {
               <tbody>{sel.transactions.map((x) => <Tr key={x.id}><Td>{t('paytype', x.transaction_type)}</Td>
                 <Td><Badge>{t('txtype', x.status)}</Badge></Td><Td>{fmtVND(x.amount)}</Td><Td>{x.idempotency_key}</Td></Tr>)}</tbody>
             </table></TableWrap>
+            {!sel.transactions.length && <Empty />}
           </>)}
         </DialogContent>
       </Dialog>
@@ -134,15 +283,58 @@ export default function Payments() {
           <DialogHeader><DialogTitle>Tạo hoàn tiền</DialogTitle></DialogHeader>
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="Đơn hàng *" className="sm:col-span-2"><OrderPicker value={refOrder} onChange={setRefOrder} /></Field>
-            <Field label="Số tiền *"><Input type="number" min={1} value={amount} onChange={(e) => setAmount(e.target.value)} /></Field>
-            <Field label="Lý do"><Input value={reason} onChange={(e) => setReason(e.target.value)} /></Field>
+            <Field label="Số tiền *"><Input type="number" min={1} value={amount} onChange={(e) => setAmount(e.target.value)} disabled={refundSaving} /></Field>
+            <Field label="Lý do"><Input value={reason} onChange={(e) => setReason(e.target.value)} disabled={refundSaving} /></Field>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setRefOpen(false)}>Hủy</Button>
-            <Button onClick={createRefund}>Lưu</Button>
+            <Button variant="outline" disabled={refundSaving} onClick={() => setRefOpen(false)}>Hủy</Button>
+            <Button disabled={refundSaving} onClick={createRefund}>{refundSaving ? 'Đang lưu...' : 'Lưu'}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={methodOpen} onOpenChange={handleMethodOpenChange}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>{methodEditing?.id ? 'Sửa phương thức' : 'Thêm phương thức'}</DialogTitle></DialogHeader>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="Mã *"><Input value={methodForm.code || ''} onChange={(e) => setMethodForm({ ...methodForm, code: e.target.value })} disabled={methodSaving} /></Field>
+            <Field label="Tên *"><Input value={methodForm.name || ''} onChange={(e) => setMethodForm({ ...methodForm, name: e.target.value })} disabled={methodSaving} /></Field>
+            <Field label="Nhà cung cấp"><Input value={methodForm.provider || ''} onChange={(e) => setMethodForm({ ...methodForm, provider: e.target.value })} disabled={methodSaving} /></Field>
+            <Field label="Loại *">
+              <Select value={methodForm.type || 'other'} onChange={(e) => setMethodForm({ ...methodForm, type: e.target.value })} disabled={methodSaving}>
+                {PAYMENT_TYPES.map((type) => <option key={type} value={type}>{t('paymethod', type)}</option>)}
+              </Select>
+            </Field>
+            <Field label="Thứ tự"><Input type="number" min={0} value={methodForm.sort_order ?? ''} onChange={(e) => setMethodForm({ ...methodForm, sort_order: e.target.value === '' ? '' : Number(e.target.value) })} disabled={methodSaving} /></Field>
+            <Field label="Trạng thái">
+              <label className="flex h-9 items-center gap-2 text-sm">
+                <input type="checkbox" checked={methodForm.is_active ?? true} onChange={(e) => setMethodForm({ ...methodForm, is_active: e.target.checked })} disabled={methodSaving} />
+                Đang bật
+              </label>
+            </Field>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" disabled={methodSaving} onClick={closeMethodDialog}>Hủy</Button>
+            <Button disabled={methodSaving} onClick={saveMethod}>{methodSaving ? 'Đang lưu...' : 'Lưu'}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <ConfirmDialog
+        open={!!methodDeleteTarget}
+        onOpenChange={(open) => !open && setMethodDeleteTarget(null)}
+        title="Xóa phương thức"
+        description={`Phương thức “${methodDeleteTarget?.name || ''}” sẽ bị xóa khỏi danh sách.`}
+        onConfirm={removeMethod}
+      />
+      <ConfirmDialog
+        open={!!methodForceDeleteTarget}
+        onOpenChange={(open) => !open && setMethodForceDeleteTarget(null)}
+        title="Xóa phương thức đã sử dụng?"
+        description={`Phương thức “${methodForceDeleteTarget?.name || ''}” đã được dùng cho ${methodForceDeleteTarget?.paymentCount || 0} thanh toán. Các thanh toán sẽ được gỡ liên kết trước khi xóa.`}
+        confirmText="Xóa cưỡng chế"
+        onConfirm={forceRemoveMethod}
+      />
     </div>
   );
 }
