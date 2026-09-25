@@ -18,9 +18,19 @@ export default function System() {
   const [audits, setAudits] = useState([]);
   const [editKey, setEditKey] = useState(null);
   const [editVal, setEditVal] = useState('');
+  const [menu, setMenu] = useState([]);
 
   const load = (quiet = false) => {
-    if (canSettings) api.get('/settings').then((r) => setSettings(r.data)).catch(() => {});
+    if (canSettings) api.get('/settings').then((r) => {
+      setSettings(r.data);
+      const m = r.data.find((x) => x.setting_key === 'shop.menu');
+      if (m) {
+        try {
+          const v = typeof m.setting_value === 'string' ? JSON.parse(m.setting_value) : m.setting_value;
+          setMenu(Array.isArray(v) ? v : []);
+        } catch { /* ignore */ }
+      }
+    }).catch(() => {});
     api.get('/notifications').then((r) => setNotifs(r.data)).catch((e) => { if (!quiet) toast.error(errMsg(e)); });
     if (canAudit) api.get('/audit-logs').then((r) => setAudits(r.data)).catch(() => {});
   };
@@ -42,13 +52,22 @@ export default function System() {
     try { await api.patch(`/notifications/${id}/read`); load(true); }
     catch (e) { toast.error(errMsg(e)); }
   };
+  const saveMenu = async () => {
+    const clean = menu.filter((m) => m.label?.trim() && m.link?.trim());
+    if (!clean.length) return toast.warning('Menu cần ít nhất 1 mục');
+    try {
+      await api.put('/settings/shop.menu', { value: clean });
+      toast.success('Đã lưu menu shop');
+      load(true);
+    } catch (e) { toast.error(errMsg(e)); }
+  };
 
   return (
     <div>
       <PageHeader title="Hệ thống" />
       <Card><CardContent className="pt-4">
         <Tabs active={tab} onChange={setTab} tabs={[
-          ...(canSettings ? [{ key: 's', label: 'Cấu hình' }] : []),
+          ...(canSettings ? [{ key: 's', label: 'Cấu hình' }, { key: 'm', label: 'Menu shop' }] : []),
           { key: 'n', label: 'Thông báo' },
           ...(canAudit ? [{ key: 'a', label: 'Nhật ký' }] : []),
         ]} />
@@ -69,6 +88,25 @@ export default function System() {
               </Tr>
             ))}</tbody>
           </table></TableWrap>
+        )}
+        {tab === 'm' && canSettings && (
+          <>
+            <p className="mb-3 text-sm text-slate-500">Menu hiện ở đầu trang bán hàng (tối đa 12 mục). Liên kết dạng <code>/san-pham?danh-muc=3</code> hoặc <code>https://...</code></p>
+            {menu.map((m, i) => (
+              <div key={i} className="mb-2 flex gap-2">
+                <Input placeholder="Tên mục (VD: Hàng Mới)" value={m.label || ''} className="max-w-[240px]"
+                  onChange={(e) => setMenu(menu.map((x, j) => (j === i ? { ...x, label: e.target.value } : x)))} />
+                <Input placeholder="Liên kết (VD: /san-pham)" value={m.link || ''} className="max-w-[320px]"
+                  onChange={(e) => setMenu(menu.map((x, j) => (j === i ? { ...x, link: e.target.value } : x)))} />
+                <Button size="sm" variant="outline" onClick={() => setMenu(menu.filter((_, j) => j !== i))}>Xóa</Button>
+                {i > 0 && <Button size="sm" variant="ghost" onClick={() => setMenu(menu.map((x, j) => (j === i - 1 ? menu[i] : j === i ? menu[i - 1] : x)))}>↑</Button>}
+              </div>
+            ))}
+            <div className="mt-2 flex gap-2">
+              <Button variant="outline" onClick={() => setMenu([...menu, { label: '', link: '' }])}>Thêm mục</Button>
+              <Button onClick={saveMenu}>Lưu menu</Button>
+            </div>
+          </>
         )}
         {tab === 'n' && (
           <><TableWrap><table className="w-full text-sm">

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { Store, Menu as MenuIcon, X, LogOut, ChevronRight, ShieldAlert } from 'lucide-react';
+import { Menu as MenuIcon, X, LogOut, ChevronRight, ShieldAlert } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '../lib/utils';
 import { useAuth } from '../auth/AuthContext';
@@ -41,15 +41,11 @@ export default function AppLayout() {
 
   const sidebar = (
     <div className="flex h-full flex-col">
-      <div className="flex items-center gap-2.5 border-b border-white/5 px-5 pb-5 pt-7">
-        <span className="flex size-9 items-center justify-center rounded-lg bg-white/10">
-          <Store className="size-5 text-white" />
-        </span>
-        {!collapsed && (
-          <div>
-            <div className="text-[15px] font-semibold tracking-tight text-white">UniMate</div>
-            <div className="text-[11px] font-medium uppercase tracking-[.06em] text-white/35">Quản trị bán hàng</div>
-          </div>
+      <div className="flex items-center border-b border-white/5 px-4 pb-5 pt-6">
+        {collapsed ? (
+          <img src="/logo-mark-dark.png" alt="UniMate" className="mx-auto size-9 object-contain" />
+        ) : (
+          <img src="/logo-dark.png" alt="UniMate — Quản trị bán hàng" className="h-10 w-full object-contain object-left" />
         )}
       </div>
       <nav className="thin-scroll flex-1 overflow-y-auto px-2 py-3">

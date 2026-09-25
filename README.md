@@ -1,5 +1,7 @@
 # UniMate Admin — Trang Quản Trị Bán Hàng
 
+![UniMate](public/logo-light.png)
+
 Giao diện quản trị (dashboard) cho nhân viên vận hành shop: xem báo cáo, xử lý đơn,
 quản lý kho, sản phẩm, khuyến mãi, nhân sự... trên cùng một nơi, phân quyền đến
 từng nút chức năng. Chạy trên React (thư viện giao diện) + shadcn/ui (bộ linh kiện

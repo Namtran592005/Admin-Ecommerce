@@ -1,6 +1,8 @@
 import axios from 'axios';
 
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://127.0.0.1/api';
+const API_BASE = import.meta.env.VITE_API_BASE || 'http://127.0.0.1:3000/api';
+export const FILES_BASE = (import.meta.env.VITE_FILES_BASE || 'http://127.0.0.1:9000/unimate').replace(/\/$/, '');
+export const fileUrl = (key) => (key ? `${FILES_BASE}/${key}` : '');
 
 let accessToken = null;
 let refreshToken = null; // RAM — fallback khi cookie refresh bị chặn cross-site (dev)

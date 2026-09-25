@@ -8,8 +8,8 @@ import { Input } from './ui/input';
 import { Badge } from './ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 
-const mediaBase = () => (import.meta.env.VITE_API_BASE || 'http://127.0.0.1/api').replace(/\/api$/, '');
-export const mediaUrl = (key) => `${mediaBase()}/files/unimate/${key}`;
+const mediaBase = () => (import.meta.env.VITE_FILES_BASE || 'http://127.0.0.1:9000/unimate').replace(/\/$/, '');
+export const mediaUrl = (key) => `${mediaBase()}/${key}`;
 
 // Chọn biến thể: tìm sản phẩm -> chọn biến thể (kèm tồn)
 export function VariantPicker({ onPick }) {

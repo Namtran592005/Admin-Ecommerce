@@ -9,6 +9,8 @@ import { TableWrap, THead, Tr, Th, Td, Empty, Toolbar } from '../components/ui/t
 import { Tabs } from '../components/ui/misc';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
 
+const CAT_ICONS = ['bi-bag', 'bi-basket', 'bi-basket3', 'bi-tag', 'bi-tags', 'bi-gift', 'bi-house', 'bi-phone', 'bi-laptop', 'bi-controller', 'bi-headphones', 'bi-watch', 'bi-camera', 'bi-bicycle', 'bi-book', 'bi-pencil', 'bi-brush', 'bi-gem', 'bi-lamp', 'bi-tools', 'bi-heart-pulse', 'bi-cup-straw', 'bi-egg-fried', 'bi-cart', 'bi-star', 'bi-truck', 'bi-ticket-perforated'];
+
 function Crud({ title, listUrl, createUrl, columns, children, form, onSubmit, open, setOpen }) {
   const [rows, setRows] = useState([]);
   const load = (quiet = false) => api.get(listUrl).then((r) => setRows(Array.isArray(r.data) ? r.data : [])).catch((e) => { if (!quiet) toast.error(errMsg(e)); });
@@ -75,12 +77,24 @@ export default function Catalog() {
         {tab === 'cat' && (
           <Crud title="danh mục" listUrl="/categories" createUrl="/categories" open={catOpen} setOpen={setCatOpen} form={catForm} onSubmit={() => setCatForm({})}
             columns={[
-              { key: 'id', title: 'ID' }, { key: 'name', title: 'Tên' }, { key: 'slug', title: 'Đường dẫn' },
+              { key: 'id', title: 'ID' },
+              { key: 'icon', title: 'Icon', render: (v) => (v ? <i className={`bi ${v}`} style={{ fontSize: 18, color: '#0f4c81' }}></i> : '—') },
+              { key: 'name', title: 'Tên' }, { key: 'slug', title: 'Đường dẫn' },
               { key: 'parent_id', title: 'Cha' }, { key: 'sort_order', title: 'Sắp xếp' },
               { key: 'status', title: 'Trạng thái', render: (v) => <Badge color={v === 'active' ? 'green' : 'default'}>{v === 'active' ? 'Đang hiện' : 'Đã ẩn'}</Badge> },
             ]}>
             <div className="grid gap-3">
               <Field label="Tên *"><Input value={catForm.name || ''} onChange={(e) => setCatForm({ ...catForm, name: e.target.value })} /></Field>
+              <Field label="Icon hiển thị ở web">
+                <div className="flex items-center gap-2">
+                  <select value={catForm.icon || ''} onChange={(e) => setCatForm({ ...catForm, icon: e.target.value || null })}
+                    className="flex h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm shadow-sm">
+                    <option value="">Không dùng icon</option>
+                    {CAT_ICONS.map((ic) => <option key={ic} value={ic}>{ic}</option>)}
+                  </select>
+                  {catForm.icon && <i className={`bi ${catForm.icon}`} style={{ fontSize: 24, color: '#0f4c81' }}></i>}
+                </div>
+              </Field>
               <div className="grid grid-cols-2 gap-3">
                 <Field label="Danh mục cha (ID)"><Input type="number" value={catForm.parent_id || ''} onChange={(e) => setCatForm({ ...catForm, parent_id: Number(e.target.value) || null })} /></Field>
                 <Field label="Sắp xếp"><Input type="number" value={catForm.sort_order || ''} onChange={(e) => setCatForm({ ...catForm, sort_order: Number(e.target.value) || 0 })} /></Field>

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Store, User, Lock } from 'lucide-react';
+import { User, Lock } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '../auth/AuthContext';
 import { errMsg } from '../api/client';
@@ -39,13 +39,13 @@ export default function Login() {
 
   return (
     <div className="flex min-h-screen">
-      <div className="hidden flex-col justify-center bg-gradient-to-br from-coal via-brand-700 to-brand-500 p-16 text-white md:flex md:w-[55%]">
-        <Store className="mb-4 size-14" strokeWidth={1.5} />
-        <h1 className="text-4xl font-bold tracking-tight">UniMate</h1>
-        <h2 className="mt-1 text-xl font-normal text-white/80">Hệ thống quản trị bán hàng</h2>
+      <div className="hidden flex-col justify-center gap-5 bg-gradient-to-br from-coal via-brand-700 to-brand-500 p-16 text-white md:flex md:w-[55%]">
+        <img src="/logo-dark.png" alt="UniMate" className="h-16 object-contain object-left" />
+        <h2 className="text-xl font-normal text-white/80">Hệ thống quản trị bán hàng</h2>
       </div>
       <div className="flex flex-1 items-center justify-center bg-white p-6">
         <form onSubmit={submit} className="w-full max-w-[380px]">
+          <img src="/logo-light.png" alt="UniMate" className="mb-4 h-10 object-contain object-left md:hidden" />
           <h2 className="text-2xl font-semibold tracking-tight">Đăng nhập</h2>
           <div className="mt-5 grid gap-4">
             <Field label="Email / Số điện thoại">
