@@ -7,8 +7,8 @@ import { t } from '../utils/status';
 import { Button } from '../components/ui/button';
 import { Input, Select, Textarea, Field } from '../components/ui/input';
 import { Card, CardContent, Badge } from '../components/ui/card';
-import { TableWrap, THead, Tr, Th, Td, Empty, PageHeader } from '../components/ui/table';
-import { ConfirmDialog, IconButton, RowActions, StatusBadge, Tabs } from '../components/ui/misc';
+import { TableWrap, THead, Tr, Th, Td, Empty, PageHeader, Toolbar } from '../components/ui/table';
+import { ConfirmDialog, IconButton, RowActions, StatusBadge, Tabs, TableSearch, useRowFilter } from '../components/ui/misc';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
 
 const COUPON_TYPES = [
@@ -67,6 +67,7 @@ export default function Promotions() {
   const { can } = useAuth();
   const writable = can('promotions.write');
   const [tab, setTab] = useState('cp');
+  const [q, setQ] = useState('');
   const [promos, setPromos] = useState([]);
   const [coupons, setCoupons] = useState([]);
   const [redems, setRedems] = useState([]);
@@ -347,6 +348,10 @@ export default function Promotions() {
     }
   };
 
+  const fCoupons = useRowFilter(coupons, q, (r) => `${r.code} ${r.description || ''} ${r.status || ''}`);
+  const fPromos = useRowFilter(promos, q, (r) => `${r.name} ${r.code} ${r.status || ''}`);
+  const fRedems = useRowFilter(redems, q, (r) => `${r.code || ''} ${r.order_id || ''} ${r.customer_id || ''}`);
+
   return (
     <div>
       <PageHeader
@@ -363,13 +368,14 @@ export default function Promotions() {
           { key: 'pr', label: 'Chương trình KM' },
           { key: 'rd', label: 'Lượt dùng coupon' },
         ]} />
+        <Toolbar><TableSearch value={q} onChange={setQ} placeholder="Tìm trong bảng đang xem..." /></Toolbar>
         {tab === 'cp' && (<>
           <TableWrap>
             <table className="w-full text-sm">
               <THead><Tr>
                 <Th>Mã</Th><Th>Loại</Th><Th>Giá trị</Th><Th>Đơn tối thiểu</Th><Th>Đã dùng</Th><Th>Trạng thái</Th><Th>Hết hạn</Th><Th className="text-right">Thao tác</Th>
               </Tr></THead>
-              <tbody>{coupons.map((coupon) => (
+              <tbody>{fCoupons.map((coupon) => (
                 <Tr key={coupon.id}>
                   <Td><Badge color="gold">{coupon.code}</Badge></Td>
                   <Td>{COUPON_TYPES.find((type) => type.value === coupon.type)?.label || coupon.type}</Td>
@@ -401,7 +407,7 @@ export default function Promotions() {
               <THead><Tr>
                 <Th>Tên</Th><Th>Mã</Th><Th>Loại</Th><Th>Giá trị</Th><Th>Lượt dùng</Th><Th>Trạng thái</Th><Th className="text-right">Thao tác</Th>
               </Tr></THead>
-              <tbody>{promos.map((promotion) => (
+              <tbody>{fPromos.map((promotion) => (
                 <Tr key={promotion.id}>
                   <Td>{promotion.name}</Td>
                   <Td>{promotion.code || '—'}</Td>
@@ -430,7 +436,7 @@ export default function Promotions() {
           <TableWrap>
             <table className="w-full text-sm">
               <THead><Tr><Th>Mã</Th><Th>Khách</Th><Th>Đơn</Th><Th>Giảm</Th><Th>Lúc</Th></Tr></THead>
-              <tbody>{redems.map((redemption) => (
+              <tbody>{fRedems.map((redemption) => (
                 <Tr key={redemption.id}>
                   <Td>{redemption.coupon_id}</Td>
                   <Td>{redemption.user_id}</Td>

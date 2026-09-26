@@ -331,18 +331,20 @@ export default function Products() {
                     <Td><StatusBadge group="product" value={row.status} /></Td>
                     <Td>
                       <RowActions>
-                        <Button size="sm" variant="outline" onClick={() => openDetail(row.id)}><Eye />Chi tiết</Button>
                         {writable && (
-                          <>
-                            <IconButton
-                              label={row.status === 'active' ? 'Ẩn sản phẩm' : 'Hiện thị sản phẩm'}
-                              onClick={() => toggleProductStatus(row)}
-                              disabled={statusBusy === row.id}
-                            >
-                              {row.status === 'active' ? <Eye /> : <EyeOff />}
-                            </IconButton>
-                            <Button size="sm" variant="outline" onClick={() => startEdit(row)} disabled={editLoadingId !== null}><Pencil />Sửa</Button>
-                          </>
+                          <IconButton
+                            label={row.status === 'active' ? 'Ẩn sản phẩm' : 'Hiện thị sản phẩm'}
+                            onClick={() => toggleProductStatus(row)}
+                            disabled={statusBusy === row.id}
+                          >
+                            {row.status === 'active' ? <EyeOff /> : <Eye />}
+                          </IconButton>
+                        )}
+                        <Button size="sm" variant="outline" onClick={() => openDetail(row.id)}>
+                          <span aria-hidden="true" className="text-[13px] font-bold leading-none">i</span>Chi tiết
+                        </Button>
+                        {writable && (
+                          <Button size="sm" variant="outline" onClick={() => startEdit(row)} disabled={editLoadingId !== null}><Pencil />Sửa</Button>
                         )}
                       </RowActions>
                     </Td>

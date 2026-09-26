@@ -7,8 +7,8 @@ import { t, opts } from '../utils/status';
 import { Button } from '../components/ui/button';
 import { Input, Field, Select, Textarea } from '../components/ui/input';
 import { Card, CardContent, Badge } from '../components/ui/card';
-import { TableWrap, THead, Tr, Th, Td, Empty, PageHeader } from '../components/ui/table';
-import { Tabs, ConfirmDialog, IconButton, RowActions, StatusBadge } from '../components/ui/misc';
+import { TableWrap, THead, Tr, Th, Td, Empty, PageHeader, Toolbar } from '../components/ui/table';
+import { Tabs, ConfirmDialog, IconButton, RowActions, StatusBadge, TableSearch, useRowFilter } from '../components/ui/misc';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
 
 const SHIP_FLOW = ['pending', 'ready', 'picked_up', 'in_transit', 'out_for_delivery', 'delivered', 'failed', 'returned', 'cancelled'];
@@ -27,6 +27,7 @@ export default function Shipping() {
   const { can } = useAuth();
   const writable = can('shipping.write');
   const [tab, setTab] = useState('s');
+  const [q, setQ] = useState('');
   const [methods, setMethods] = useState([]);
   const [providers, setProviders] = useState([]);
   const [ships, setShips] = useState([]);
@@ -165,15 +166,19 @@ export default function Shipping() {
     }
   };
 
+  const fShips = useRowFilter(ships, q, (r) => `${r.order_id || ''} ${r.tracking_no || ''} ${r.status || ''} ${r.carrier || ''}`);
+  const fMethods = useRowFilter(methods, q, (r) => `${r.code} ${r.name} ${r.provider || ''}`);
+
   return (
     <div>
       <PageHeader title="Vận chuyển" actions={writable && tab === 'm' && <Button onClick={startMethodCreate}><Plus />Thêm hình thức</Button>} />
       <Card><CardContent className="pt-4">
         <Tabs active={tab} onChange={setTab} tabs={[{ key: 's', label: 'Vận đơn' }, { key: 'm', label: 'Hình thức giao hàng' }]} />
+        <Toolbar><TableSearch value={q} onChange={setQ} placeholder="Tìm trong bảng đang xem..." /></Toolbar>
         {tab === 's' && (<>
           <TableWrap><table className="w-full text-sm">
             <THead><Tr><Th>ID</Th><Th>Đơn</Th><Th>Mã vận đơn</Th><Th>Trạng thái</Th><Th>Phí giao hàng</Th><Th>COD</Th><Th /></Tr></THead>
-            <tbody>{ships.map((r) => (
+            <tbody>{fShips.map((r) => (
               <Tr key={r.id}>
                 <Td>{r.id}</Td><Td>{r.order_id}</Td><Td>{r.tracking_number}</Td>
                 <Td><StatusBadge group="ship" value={r.status} /></Td>
@@ -188,7 +193,7 @@ export default function Shipping() {
           {writable && <div className="mb-3"><Button onClick={startMethodCreate}><Plus />Thêm hình thức</Button></div>}
           <TableWrap><table className="w-full text-sm">
             <THead><Tr><Th>Mã</Th><Th>Tên</Th><Th>Nhà cung cấp</Th><Th>Phí</Th><Th>Số vận đơn dùng</Th><Th>Trạng thái</Th><Th className="text-right">Thao tác</Th></Tr></THead>
-            <tbody>{methods.map((m) => <Tr key={m.id}>
+            <tbody>{fMethods.map((m) => <Tr key={m.id}>
               <Td>{m.code}</Td><Td>{m.name}</Td><Td>{m.provider_name || '—'}</Td><Td>{fmtVND(m.base_fee)}</Td>
               <Td>{m.shipment_count ?? 0}</Td>
               <Td><Badge color={isActive(m.is_active) ? 'green' : 'default'}>{isActive(m.is_active) ? 'Đang bật' : 'Đang tắt'}</Badge></Td>

@@ -145,21 +145,39 @@ export default function OrderCreate() {
     <div className="mx-auto max-w-4xl">
       <h1 className="mb-4 text-xl font-semibold tracking-tight">Tạo đơn</h1>
 
-      <ol className="mb-4 flex items-start">
-        {STEPS.map((s, i) => (
-          <li key={s} className={cn('flex flex-1 items-center', i < STEPS.length - 1 && 'w-full')}>
-            <button onClick={() => i < step && setStep(i)} disabled={i > step}
-              className="flex flex-col items-center gap-1.5">
-              <span className={cn('flex size-8 items-center justify-center rounded-full text-sm font-semibold transition-colors',
-                i < step ? 'bg-emerald-500 text-white' : i === step ? 'bg-brand-500 text-white shadow' : 'bg-slate-200 text-slate-500')}>
-                {i < step ? <Check className="size-4" /> : i + 1}
-              </span>
-              <span className={cn('whitespace-nowrap text-xs', i === step ? 'font-semibold text-brand-600' : 'text-slate-500')}>{s}</span>
-            </button>
-            {i < STEPS.length - 1 && <span className={cn('mx-2 mb-5 h-0.5 flex-1 rounded', i < step ? 'bg-emerald-500' : 'bg-slate-200')} />}
-          </li>
-        ))}
-      </ol>
+      {/* px-5 đặt ở ngoài <ol> để <ol> trùng khớp đúng vùng nội dung của Card.
+          Nếu đặt padding vào chính <ol>, phần trăm của vạch nối sẽ tính trên
+          cả padding-box nên vạch lệch khỏi tâm vòng tròn. */}
+      <div className="mb-4 px-5">
+        <ol className="relative grid grid-cols-5">
+          {/* Vạch nối chạy từ tâm vòng tròn đầu tới tâm vòng tròn cuối (10% -> 90%),
+              nên các bước luôn đều nhau kể cả khi nhãn dài khác nhau. Phần đã đi
+              được tô xanh theo đúng tỉ lệ bước đã hoàn thành. */}
+          <span aria-hidden="true" className="pointer-events-none absolute top-4 right-[10%] left-[10%] h-0.5 rounded bg-slate-200">
+            <span
+              className="block h-full rounded bg-emerald-500 transition-[width] duration-300"
+              style={{ width: `${(Math.min(step, STEPS.length - 1) / (STEPS.length - 1)) * 100}%` }}
+            />
+          </span>
+          {STEPS.map((s, i) => (
+            <li key={s} className="relative flex flex-col items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => i < step && setStep(i)}
+                disabled={i > step}
+                aria-current={i === step ? 'step' : undefined}
+                className="flex flex-col items-center gap-1.5"
+              >
+                <span className={cn('flex size-8 items-center justify-center rounded-full text-sm font-semibold transition-colors',
+                  i < step ? 'bg-emerald-500 text-white' : i === step ? 'bg-brand-500 text-white shadow' : 'bg-slate-200 text-slate-500')}>
+                  {i < step ? <Check className="size-4" /> : i + 1}
+                </span>
+                <span className={cn('text-center text-xs leading-tight', i === step ? 'font-semibold text-brand-600' : 'text-slate-500')}>{s}</span>
+              </button>
+            </li>
+          ))}
+        </ol>
+      </div>
 
       <Card>
         <CardContent className="pt-5">

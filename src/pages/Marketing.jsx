@@ -7,8 +7,8 @@ import { t, opts } from '../utils/status';
 import { Button } from '../components/ui/button';
 import { Input, Select, Field } from '../components/ui/input';
 import { Card, CardContent, Badge } from '../components/ui/card';
-import { TableWrap, THead, Tr, Th, Td, Empty, PageHeader } from '../components/ui/table';
-import { Tabs, ConfirmDialog, IconButton, RowActions } from '../components/ui/misc';
+import { TableWrap, THead, Tr, Th, Td, Empty, PageHeader, Toolbar } from '../components/ui/table';
+import { Tabs, ConfirmDialog, IconButton, RowActions, TableSearch, useRowFilter } from '../components/ui/misc';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
 import { MediaPicker, mediaUrl } from '../components/pickers';
 
@@ -110,6 +110,7 @@ export default function Marketing() {
   const { can } = useAuth();
   const writable = can('promotions.write');
   const [tab, setTab] = useState('c');
+  const [q, setQ] = useState('');
   const [camps, setCamps] = useState([]);
   const [banners, setBanners] = useState([]);
 
@@ -235,6 +236,9 @@ export default function Marketing() {
     finally { setDeleteBusy(false); }
   };
 
+  const fCamps = useRowFilter(camps, q, (r) => `${r.name} ${r.description || ''} ${r.status || ''}`);
+  const fBanners = useRowFilter(banners, q, (r) => `${r.title} ${r.link_url || ''} ${r.status || ''} ${r.alt_text || ''}`);
+
   return (
     <div>
       <PageHeader title="Marketing" actions={writable && (
@@ -245,10 +249,11 @@ export default function Marketing() {
         <Tabs active={tab} onChange={setTab} tabs={[
           { key: 'c', label: 'Chiến dịch' }, { key: 'b', label: 'Banner' }, { key: 'e', label: 'Gửi email' },
         ]} />
+        <Toolbar><TableSearch value={q} onChange={setQ} placeholder="Tìm trong bảng đang xem..." /></Toolbar>
         {tab === 'c' && (<>
           <TableWrap><table className="w-full text-sm">
             <THead><Tr><Th>Tên</Th><Th>Mô tả</Th><Th>Trạng thái</Th><Th>Ngày tạo</Th><Th className="text-right">Thao tác</Th></Tr></THead>
-            <tbody>{camps.map((c) => (
+            <tbody>{fCamps.map((c) => (
               <Tr key={c.id}>
                 <Td className="font-medium">{c.name}</Td>
                 <Td className="max-w-[280px] truncate text-slate-500">{c.description || '—'}</Td>
@@ -278,7 +283,7 @@ export default function Marketing() {
             <THead><Tr>
               <Th className="w-10">#</Th><Th>Media</Th><Th>Tiêu đề</Th><Th>Liên kết</Th><Th>Trạng thái</Th><Th className="text-right">Thao tác</Th>
             </Tr></THead>
-            <tbody>{banners.map((b, i) => (
+            <tbody>{fBanners.map((b, i) => (
               <Tr key={b.id}>
                 <Td className="text-slate-400">{i + 1}</Td>
                 <Td>

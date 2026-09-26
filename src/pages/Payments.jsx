@@ -7,8 +7,8 @@ import { t, opts } from '../utils/status';
 import { Button } from '../components/ui/button';
 import { Input, Field, Select } from '../components/ui/input';
 import { Card, CardContent, Badge } from '../components/ui/card';
-import { TableWrap, THead, Tr, Th, Td, Empty, PageHeader } from '../components/ui/table';
-import { Tabs, ConfirmDialog, IconButton, RowActions, StatusBadge } from '../components/ui/misc';
+import { TableWrap, THead, Tr, Th, Td, Empty, PageHeader, Toolbar } from '../components/ui/table';
+import { Tabs, ConfirmDialog, IconButton, RowActions, StatusBadge, TableSearch, useRowFilter } from '../components/ui/misc';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
 import { OrderPicker } from '../components/pickers';
 
@@ -28,6 +28,7 @@ export default function Payments() {
   const { can } = useAuth();
   const writable = can('payments.write');
   const [tab, setTab] = useState('pay');
+  const [q, setQ] = useState('');
   const [pays, setPays] = useState([]);
   const [refs, setRefs] = useState([]);
   const [methods, setMethods] = useState([]);
@@ -199,6 +200,10 @@ export default function Payments() {
     }
   };
 
+  const fPays = useRowFilter(pays, q, (r) => `${r.order_id || ''} ${r.method_code || ''} ${r.status || ''} ${r.gateway_txn_id || ''}`);
+  const fRefs = useRowFilter(refs, q, (r) => `${r.refund_number || ''} ${r.order_id || ''} ${r.reason || ''} ${r.status || ''}`);
+  const fMethods = useRowFilter(methods, q, (r) => `${r.code} ${r.name} ${r.provider || ''}`);
+
   return (
     <div>
       <PageHeader title="Thanh toán" actions={writable && tab === 'ref' && <Button onClick={openRefund}><Plus />Tạo hoàn tiền</Button>} />
@@ -206,10 +211,11 @@ export default function Payments() {
         <Tabs active={tab} onChange={setTab} tabs={[
           { key: 'pay', label: 'Thanh toán' }, { key: 'ref', label: 'Hoàn tiền' }, { key: 'm', label: 'Phương thức' },
         ]} />
+        <Toolbar><TableSearch value={q} onChange={setQ} placeholder="Tìm trong bảng đang xem..." /></Toolbar>
         {tab === 'pay' && (
           <><TableWrap><table className="w-full text-sm">
             <THead><Tr><Th>ID</Th><Th>Đơn</Th><Th>Phương thức</Th><Th>Số tiền</Th><Th>Trạng thái</Th><Th>Đã thu</Th><Th /></Tr></THead>
-            <tbody>{pays.map((r) => (
+            <tbody>{fPays.map((r) => (
               <Tr key={r.id}>
                 <Td>{r.id}</Td><Td>{r.order_id}</Td><Td>{t('paymethod', r.method_code)}</Td><Td>{fmtVND(r.amount)}</Td>
                 <Td><StatusBadge group="payment" value={r.status} /></Td>
@@ -226,7 +232,7 @@ export default function Payments() {
         {tab === 'ref' && (
           <><TableWrap><table className="w-full text-sm">
             <THead><Tr><Th>Số</Th><Th>Đơn</Th><Th>Số tiền</Th><Th>Lý do</Th><Th>Trạng thái</Th><Th /></Tr></THead>
-            <tbody>{refs.map((r) => (
+            <tbody>{fRefs.map((r) => (
               <Tr key={r.id}>
                 <Td>{r.refund_number}</Td><Td>{r.order_id}</Td><Td>{fmtVND(r.amount)}</Td><Td>{r.reason}</Td>
                 <Td><StatusBadge group="payment" value={t('refund', r.status)} /></Td>
@@ -245,7 +251,7 @@ export default function Payments() {
           {writable && <div className="mb-3"><Button onClick={startMethodCreate}><Plus />Thêm phương thức</Button></div>}
           <TableWrap><table className="w-full text-sm">
             <THead><Tr><Th>Mã</Th><Th>Tên</Th><Th>Nhà cung cấp</Th><Th>Loại</Th><Th>Thứ tự</Th><Th>Trạng thái</Th><Th className="text-right">Thao tác</Th></Tr></THead>
-            <tbody>{methods.map((m) => <Tr key={m.id}>
+            <tbody>{fMethods.map((m) => <Tr key={m.id}>
               <Td>{m.code}</Td><Td>{m.name}</Td><Td>{m.provider || '—'}</Td>
               <Td><Badge>{t('paymethod', m.type)}</Badge></Td>
               <Td>{m.sort_order ?? 0}</Td>

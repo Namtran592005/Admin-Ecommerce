@@ -7,8 +7,8 @@ import { t } from '../utils/status';
 import { Button } from '../components/ui/button';
 import { Input, Select, Field } from '../components/ui/input';
 import { Card, CardContent, Badge } from '../components/ui/card';
-import { TableWrap, THead, Tr, Th, Td, Empty, PageHeader } from '../components/ui/table';
-import { Tabs, ConfirmDialog, IconButton, RowActions } from '../components/ui/misc';
+import { TableWrap, THead, Tr, Th, Td, Empty, PageHeader, Toolbar } from '../components/ui/table';
+import { Tabs, ConfirmDialog, IconButton, RowActions, TableSearch, useRowFilter } from '../components/ui/misc';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
 import { VariantPicker, PickedTag } from '../components/pickers';
 
@@ -27,6 +27,7 @@ export default function Inventory() {
   const { can } = useAuth();
   const writable = can('inventory.write');
   const [tab, setTab] = useState('stock');
+  const [q, setQ] = useState('');
   const [whs, setWhs] = useState([]);
   const [stocks, setStocks] = useState([]);
   const [moves, setMoves] = useState([]);
@@ -283,6 +284,12 @@ export default function Inventory() {
     }
   };
 
+  const fStocks = useRowFilter(stocks, q, (r) => `${r.warehouse_code} ${r.sku} ${r.variant_name}`);
+  const fWhs = useRowFilter(whs, q, (r) => `${r.code} ${r.name} ${r.address || ''}`);
+  const fMoves = useRowFilter(moves, q, (r) => `${r.type || ''} ${r.reference_type || ''} ${r.reference_id || ''} ${r.note || ''}`);
+  const fAdjs = useRowFilter(adjs, q, (r) => `${r.adjustment_number} ${r.reason || ''} ${r.status || ''}`);
+  const fTrfs = useRowFilter(trfs, q, (r) => `${r.transfer_number} ${r.status || ''}`);
+
   return (
     <div>
       <PageHeader title="Kho hàng" actions={writable && tab === 'stock' && <Button onClick={startStockCreate}><Plus />Nhập / cập nhật tồn</Button>} />
@@ -291,10 +298,11 @@ export default function Inventory() {
           { key: 'stock', label: 'Tồn kho' }, { key: 'wh', label: 'Kho hàng' },
           { key: 'move', label: 'Xuất nhập kho' }, { key: 'adj', label: 'Điều chỉnh' }, { key: 'trf', label: 'Chuyển kho' },
         ]} />
+        <Toolbar><TableSearch value={q} onChange={setQ} placeholder="Tìm trong bảng đang xem..." /></Toolbar>
         {tab === 'stock' && (<>
           <TableWrap><table className="w-full text-sm">
             <THead><Tr><Th>Kho</Th><Th>SKU</Th><Th>Tên</Th><Th>Tồn</Th><Th>Giữ</Th><Th>Khả dụng</Th><Th>Ngưỡng</Th><Th className="text-right">Thao tác</Th></Tr></THead>
-            <tbody>{stocks.map((r) => <Tr key={r.warehouse_id + '-' + r.variant_id}>
+            <tbody>{fStocks.map((r) => <Tr key={r.warehouse_id + '-' + r.variant_id}>
               <Td>{r.warehouse_code}</Td><Td>{r.sku}</Td><Td>{r.variant_name}</Td><Td>{r.quantity}</Td>
               <Td>{r.reserved_quantity}</Td><Td>{r.quantity - r.reserved_quantity}</Td><Td>{r.reorder_level}</Td>
               <Td><RowActions>{writable && (<>
@@ -309,7 +317,7 @@ export default function Inventory() {
           {writable && <div className="mb-3"><Button onClick={startWhCreate}><Plus />Thêm kho</Button></div>}
           <TableWrap><table className="w-full text-sm">
             <THead><Tr><Th>Mã</Th><Th>Tên</Th><Th>Địa chỉ</Th><Th>Trạng thái</Th><Th className="text-right">Thao tác</Th></Tr></THead>
-            <tbody>{whs.map((w) => <Tr key={w.id}>
+            <tbody>{fWhs.map((w) => <Tr key={w.id}>
               <Td>{w.code}</Td><Td>{w.name}</Td><Td>{w.address}</Td>
               <Td><Badge color={w.status === 'active' ? 'green' : 'default'}>{w.status === 'active' ? 'Đang hoạt động' : 'Ngừng hoạt động'}</Badge></Td>
               <Td><RowActions>{writable && (<>
@@ -326,7 +334,7 @@ export default function Inventory() {
         {tab === 'move' && (<>
           <TableWrap><table className="w-full text-sm">
             <THead><Tr><Th>Kho</Th><Th>Biến thể</Th><Th>Loại</Th><Th>Số lượng</Th><Th>Tham chiếu</Th><Th>Ghi chú</Th><Th>Lúc</Th></Tr></THead>
-            <tbody>{moves.map((m) => <Tr key={m.id}><Td>{m.warehouse_id}</Td><Td>{m.variant_id}</Td>
+            <tbody>{fMoves.map((m) => <Tr key={m.id}><Td>{m.warehouse_id}</Td><Td>{m.variant_id}</Td>
               <Td><Badge>{t('move', m.type)}</Badge></Td><Td>{m.quantity}</Td><Td>{m.reference_type}</Td><Td>{m.note}</Td><Td className="whitespace-nowrap">{fmtDate(m.created_at)}</Td></Tr>)}</tbody>
           </table></TableWrap>
           {!moves.length && <Empty />}
@@ -335,7 +343,7 @@ export default function Inventory() {
           {writable && <div className="mb-3"><Button onClick={startAdjCreate}><Plus />Tạo phiếu</Button></div>}
           <TableWrap><table className="w-full text-sm">
             <THead><Tr><Th>Số phiếu</Th><Th>Kho</Th><Th>Lý do</Th><Th>Trạng thái</Th><Th className="text-right">Thao tác</Th></Tr></THead>
-            <tbody>{adjs.map((a) => <Tr key={a.id}><Td>{a.adjustment_number}</Td><Td>{a.warehouse_id}</Td><Td>{a.reason}</Td>
+            <tbody>{fAdjs.map((a) => <Tr key={a.id}><Td>{a.adjustment_number}</Td><Td>{a.warehouse_id}</Td><Td>{a.reason}</Td>
               <Td><Badge>{t('adjust', a.status)}</Badge></Td>
               <Td>{writable && a.status === 'draft' && <Button size="sm" onClick={() => setPostTarget(a)}>Chốt</Button>}</Td></Tr>)}</tbody>
           </table></TableWrap>
@@ -344,7 +352,7 @@ export default function Inventory() {
         {tab === 'trf' && (<>
           <TableWrap><table className="w-full text-sm">
             <THead><Tr><Th>Số</Th><Th>Từ kho</Th><Th>Đến kho</Th><Th>Trạng thái</Th></Tr></THead>
-            <tbody>{trfs.map((x) => <Tr key={x.id}><Td>{x.transfer_number}</Td><Td>{x.source_warehouse_id}</Td><Td>{x.destination_warehouse_id}</Td>
+            <tbody>{fTrfs.map((x) => <Tr key={x.id}><Td>{x.transfer_number}</Td><Td>{x.source_warehouse_id}</Td><Td>{x.destination_warehouse_id}</Td>
               <Td><Badge>{t('transfer', x.status)}</Badge></Td></Tr>)}</tbody>
           </table></TableWrap>
           {!trfs.length && <Empty />}

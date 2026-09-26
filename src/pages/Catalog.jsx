@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Eye, EyeOff, Pencil, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { api, errMsg } from '../api/client';
@@ -7,7 +7,7 @@ import { Button } from '../components/ui/button';
 import { Input, Field, Select } from '../components/ui/input';
 import { Card, CardContent, Badge } from '../components/ui/card';
 import { TableWrap, THead, Tr, Th, Td, Empty, Toolbar } from '../components/ui/table';
-import { Tabs, ConfirmDialog, IconButton, RowActions } from '../components/ui/misc';
+import { Tabs, ConfirmDialog, IconButton, RowActions, TableSearch, useRowFilter } from '../components/ui/misc';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
 import { MediaPicker, mediaUrl } from '../components/pickers';
 
@@ -50,11 +50,12 @@ const attributeValuePayload = (value = {}) => ({
   sort_order: Number(value.sort_order) || 0,
 });
 
-function Crud({ title, listUrl, columns, children, form, setForm, editing, setEditing, open, setOpen, canWrite, buildPayload }) {
+function Crud({ title, listUrl, columns, children, form, setForm, editing, setEditing, open, setOpen, canWrite, buildPayload, search, searchPlaceholder }) {
   const [rows, setRows] = useState([]);
   const [saving, setSaving] = useState(false);
   const [toggleId, setToggleId] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [q, setQ] = useState('');
 
   const load = (quiet = false) => api.get(listUrl)
     .then((response) => setRows(Array.isArray(response.data) ? response.data : []))
@@ -125,9 +126,16 @@ function Crud({ title, listUrl, columns, children, form, setForm, editing, setEd
     }
   };
 
+  // Mặc định lấy chuỗi tìm từ các cột dạng chữ/số trong `columns`.
+  const searchKeys = useMemo(() => columns.map((c) => c.key).filter((k) => k !== 'image_key' && k !== 'logo_media_id'), [columns]);
+  const shown = useRowFilter(rows, q, search
+    ? (r) => search(r)
+    : (r) => searchKeys.map((k) => (r[k] == null ? '' : r[k])).join(' '));
+
   return (
     <>
       {canWrite && <Button onClick={startCreate}><Plus />Thêm {title}</Button>}
+      <TableSearch value={q} onChange={setQ} placeholder={searchPlaceholder || `Tìm ${title.toLowerCase()}...`} className="mt-3" />
       <TableWrap className="mt-3">
         <table className="w-full text-sm">
           <THead>
@@ -137,7 +145,7 @@ function Crud({ title, listUrl, columns, children, form, setForm, editing, setEd
             </Tr>
           </THead>
           <tbody>
-            {rows.map((row) => (
+            {shown.map((row) => (
               <Tr key={row.id}>
                 {columns.map((column) => (
                   <Td key={column.key}>{column.render ? column.render(row[column.key], row) : (row[column.key] ?? '—')}</Td>
@@ -209,6 +217,7 @@ export default function Catalog() {
   const [brandEditing, setBrandEditing] = useState(null);
   const [brandForm, setBrandForm] = useState({});
   const [attrs, setAttrs] = useState([]);
+  const [attrQ, setAttrQ] = useState('');
   const [attrId, setAttrId] = useState('');
   const [attrOpen, setAttrOpen] = useState(false);
   const [attrEditing, setAttrEditing] = useState(null);
@@ -347,6 +356,8 @@ export default function Catalog() {
     }
   };
 
+  const fAttrs = useRowFilter(attrs, attrQ, (r) => `${r.name} ${r.code} ${r.display_type || ''}`);
+
   return (
     <div>
       <h1 className="mb-4 text-xl font-semibold tracking-tight">Danh mục & Thương hiệu</h1>
@@ -482,6 +493,7 @@ export default function Catalog() {
           {tab === 'attr' && (
             <>
               {canWriteProducts && <Button onClick={startAttrCreate}><Plus />Thêm thuộc tính</Button>}
+              <TableSearch value={attrQ} onChange={setAttrQ} placeholder="Tìm thuộc tính hoặc mã..." className="mt-3" />
               <TableWrap className="mt-3">
                 <table className="w-full text-sm">
                   <THead>
@@ -494,7 +506,7 @@ export default function Catalog() {
                     </Tr>
                   </THead>
                   <tbody>
-                    {attrs.map((attribute) => (
+                    {fAttrs.map((attribute) => (
                       <Tr key={attribute.id}>
                         <Td className="font-medium">{attribute.name}</Td>
                         <Td><Badge>{attribute.code}</Badge></Td>

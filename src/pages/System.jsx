@@ -5,8 +5,8 @@ import { useAuth } from '../auth/AuthContext';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Card, CardContent, Badge } from '../components/ui/card';
-import { TableWrap, THead, Tr, Th, Td, Empty, PageHeader } from '../components/ui/table';
-import { Tabs } from '../components/ui/misc';
+import { TableWrap, THead, Tr, Th, Td, Empty, PageHeader, Toolbar } from '../components/ui/table';
+import { Tabs, TableSearch, useRowFilter } from '../components/ui/misc';
 import PageContent from './PageContent';
 
 export default function System() {
@@ -20,6 +20,7 @@ export default function System() {
   const [editKey, setEditKey] = useState(null);
   const [editVal, setEditVal] = useState('');
   const [menu, setMenu] = useState([]);
+  const [q, setQ] = useState('');
 
   const load = (quiet = false) => {
     if (canSettings) api.get('/settings').then((r) => {
@@ -63,6 +64,10 @@ export default function System() {
     } catch (e) { toast.error(errMsg(e)); }
   };
 
+  const fSettings = useRowFilter(settings, q, (r) => `${r.setting_key} ${r.description || ''}`);
+  const fNotifs = useRowFilter(notifs, q, (r) => `${r.title || ''} ${r.body || ''} ${r.type || ''}`);
+  const fAudits = useRowFilter(audits, q, (r) => `${r.user_email || ''} ${r.action} ${r.entity_type || ''} ${r.ip || ''}`);
+
   return (
     <div>
       <PageHeader title="Hệ thống" />
@@ -72,10 +77,11 @@ export default function System() {
           { key: 'n', label: 'Thông báo' },
           ...(canAudit ? [{ key: 'a', label: 'Nhật ký' }] : []),
         ]} />
+        <Toolbar><TableSearch value={q} onChange={setQ} placeholder="Tìm trong bảng đang xem..." /></Toolbar>
         {tab === 's' && canSettings && (
           <TableWrap><table className="w-full text-sm">
             <THead><Tr><Th>Khóa</Th><Th>Giá trị</Th><Th>Công khai</Th><Th /></Tr></THead>
-            <tbody>{settings.map((r) => (
+            <tbody>{fSettings.map((r) => (
               <Tr key={r.setting_key}>
                 <Td className="font-mono text-xs">{r.setting_key}</Td>
                 <Td>{editKey === r.setting_key
@@ -113,7 +119,7 @@ export default function System() {
         {tab === 'n' && (
           <><TableWrap><table className="w-full text-sm">
             <THead><Tr><Th>Loại</Th><Th>Tiêu đề</Th><Th>Nội dung</Th><Th>Đã đọc</Th><Th /></Tr></THead>
-            <tbody>{notifs.map((r) => (
+            <tbody>{fNotifs.map((r) => (
               <Tr key={r.id}>
                 <Td><Badge>{r.type}</Badge></Td><Td>{r.title}</Td><Td>{r.body}</Td>
                 <Td>{r.read_at ? fmtDate(r.read_at) : <Badge color="orange">Chưa</Badge>}</Td>
@@ -126,7 +132,7 @@ export default function System() {
         {tab === 'a' && canAudit && (
           <TableWrap><table className="w-full text-sm">
             <THead><Tr><Th>Người</Th><Th>Hành động</Th><Th>Đối tượng</Th><Th>ID</Th><Th>Địa chỉ IP</Th><Th>Lúc</Th></Tr></THead>
-            <tbody>{audits.map((r) => (
+            <tbody>{fAudits.map((r) => (
               <Tr key={r.id}><Td>{r.actor_user_id}</Td><Td>{r.action}</Td><Td>{r.entity_type}</Td>
                 <Td>{r.entity_id}</Td><Td>{r.ip_address}</Td><Td className="whitespace-nowrap">{fmtDate(r.created_at)}</Td></Tr>
             ))}</tbody>

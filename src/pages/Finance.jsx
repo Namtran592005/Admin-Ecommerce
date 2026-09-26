@@ -7,8 +7,8 @@ import { t, opts } from '../utils/status';
 import { Button } from '../components/ui/button';
 import { Input, Select, Field, Textarea } from '../components/ui/input';
 import { Card, CardContent, Badge } from '../components/ui/card';
-import { TableWrap, THead, Tr, Th, Td, Empty, PageHeader } from '../components/ui/table';
-import { Tabs, ConfirmDialog } from '../components/ui/misc';
+import { TableWrap, THead, Tr, Th, Td, Empty, PageHeader, Toolbar } from '../components/ui/table';
+import { Tabs, ConfirmDialog, TableSearch, useRowFilter } from '../components/ui/misc';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
 import { OrderPicker } from '../components/pickers';
 
@@ -18,6 +18,7 @@ export default function Finance() {
   const { can } = useAuth();
   const writable = can('payments.write');
   const [tab, setTab] = useState('inv');
+  const [q, setQ] = useState('');
   const [invs, setInvs] = useState([]);
   const [flows, setFlows] = useState([]);
   const [invOpen, setInvOpen] = useState(false);
@@ -105,6 +106,9 @@ export default function Finance() {
     finally { setFlSaving(false); }
   };
 
+  const fInvs = useRowFilter(invs, q, (r) => `${r.invoice_number} ${r.order_id || ''} ${r.customer_name || r.customer_email || ''} ${r.status || ''}`);
+  const fFlows = useRowFilter(flows, q, (r) => `${r.type || ''} ${r.reference_type || ''} ${r.description || ''}`);
+
   return (
     <div>
       <PageHeader title="Hóa đơn & Dòng tiền" actions={writable && (
@@ -114,10 +118,11 @@ export default function Finance() {
       )} />
       <Card><CardContent className="pt-4">
         <Tabs active={tab} onChange={setTab} tabs={[{ key: 'inv', label: 'Hóa đơn' }, { key: 'flow', label: 'Dòng tiền' }]} />
+        <Toolbar><TableSearch value={q} onChange={setQ} placeholder="Tìm trong bảng đang xem..." /></Toolbar>
         {tab === 'inv' && (<>
           <TableWrap><table className="w-full text-sm">
             <THead><Tr><Th>Số HĐ</Th><Th>Đơn</Th><Th>Khách</Th><Th>Tổng</Th><Th>Trạng thái</Th><Th className="text-right">Thao tác</Th></Tr></THead>
-            <tbody>{invs.map((r) => (
+            <tbody>{fInvs.map((r) => (
               <Tr key={r.id}>
                 <Td>{r.invoice_number}</Td><Td>{r.order_id}</Td><Td>{r.buyer_name || r.buyer_company_name || '—'}</Td><Td>{fmtVND(r.total_amount)}</Td>
                 <Td><Badge color={r.status === 'issued' ? 'green' : 'default'}>{t('invoice', r.status)}</Badge></Td>
@@ -135,7 +140,7 @@ export default function Finance() {
         {tab === 'flow' && (<>
           <TableWrap><table className="w-full text-sm">
             <THead><Tr><Th>Loại</Th><Th>Tham chiếu</Th><Th>Số tiền</Th><Th>Diễn giải</Th><Th>Ngày</Th></Tr></THead>
-            <tbody>{flows.map((r) => (
+            <tbody>{fFlows.map((r) => (
               <Tr key={r.id}>
                 <Td><Badge color={r.type === 'income' ? 'green' : 'red'}>{t('cash', r.type)}</Badge></Td>
                 <Td>{r.reference_type}</Td><Td>{fmtVND(r.amount)}</Td><Td>{r.description}</Td>

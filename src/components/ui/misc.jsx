@@ -1,7 +1,9 @@
 import * as React from 'react';
+import { Search, X } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { Badge } from './card';
 import { Button } from './button';
+import { Input } from './input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from './dialog';
 import { t } from '../../utils/status';
 
@@ -43,6 +45,56 @@ export const Tabs = ({ tabs, active, onChange }) => (
 export const Skeleton = ({ className }) => (
   <div className={cn('animate-pulse rounded-lg bg-slate-100', className)} />
 );
+
+/**
+ * Ô tìm kiếm cho bảng dữ liệu dài. Lọc ngay trên máy nên không phải chờ
+ * gọi API, và có nút X để xoá nhanh.
+ */
+export const TableSearch = ({ value, onChange, placeholder = 'Tìm kiếm...', className = 'w-full max-w-[240px]' }) => (
+  <span className={cn('relative block', className)}>
+    <Search aria-hidden="true" className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-slate-400" />
+    <Input
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder}
+      aria-label={placeholder}
+      className="pr-8 pl-8"
+    />
+    {value && (
+      <button
+        type="button"
+        onClick={() => onChange('')}
+        aria-label="Xoá tìm kiếm"
+        className="absolute top-1/2 right-2 grid size-5 -translate-y-1/2 place-items-center rounded text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+      >
+        <X className="size-3.5" />
+      </button>
+    )}
+  </span>
+);
+
+/**
+ * Lọc danh sách theo từ khoá. `fields` là mảng tên cột cần so khớp, hoặc một
+ * hàm tự trả về chuỗi để so (dùng khi dữ liệu nằm trong object con).
+ */
+export function useRowFilter(rows, q, fields) {
+  const key = typeof fields === 'function' ? fields.toString() : [...fields].join('|');
+  return React.useMemo(() => {
+    const list = rows || [];
+    const s = (q || '').trim().toLowerCase();
+    if (!s) return list;
+    const keys = typeof fields === 'function' ? null : fields;
+    return list.filter((r) => {
+      if (keys) return keys.some((k) => {
+        const v = r[k];
+        return v != null && String(v).toLowerCase().includes(s);
+      });
+      const text = fields(r);
+      return text != null && String(text).toLowerCase().includes(s);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows, q, key]);
+}
 
 export const ConfirmButton = ({ title, onConfirm, children, ...props }) => {
   const [ask, setAsk] = React.useState(false);
