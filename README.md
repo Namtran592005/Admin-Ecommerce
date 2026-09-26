@@ -1,65 +1,84 @@
-# UniMate Admin — Trang Quản Trị Bán Hàng
+# UniMate Admin — Trang quản trị
 
-![UniMate](public/logo-light.png)
+React 19 + Vite + Tailwind 4. Giao diện vận hành cho nhân viên shop: đơn hàng, kho,
+sản phẩm, khuyến mãi, nhân sự. Phân quyền đến từng menu và từng nút bấm.
 
-Giao diện quản trị (dashboard) cho nhân viên vận hành shop: xem báo cáo, xử lý đơn,
-quản lý kho, sản phẩm, khuyến mãi, nhân sự... trên cùng một nơi, phân quyền đến
-từng nút chức năng. Chạy trên React (thư viện giao diện) + shadcn/ui (bộ linh kiện
-chuẩn doanh nghiệp), chữ và ngày giờ 100% tiếng Việt.
-
-## Tính năng theo menu
-
-| Menu | Làm được gì | Ai thấy (quyền) |
-|---|---|---|
-| Tổng quan | Doanh thu, biểu đồ 7 ngày, top sản phẩm, tồn sắp hết, thao tác nhanh | Người có quyền xem báo cáo |
-| Đơn hàng | Lọc, xem chi tiết (hàng/địa chỉ/lịch sử/ghi chú), duyệt chuyển trạng thái | Bộ phận đơn hàng |
-| Tạo đơn | Nhân viên đặt hộ khách gọi qua điện thoại (4 bước: khách → hàng → giao nhận → chốt) | Người được duyệt đơn |
-| Sản phẩm | Thêm/sửa, biến thể (màu/size/giá), ảnh xem trước + lightbox, sắp xếp, đặt ảnh chính, **ẩn/hiện nhanh**, **xoá mềm hoặc xoá vĩnh viễn** | Quản lý hàng hóa |
-| Danh mục | Danh mục, thương hiệu, thuộc tính + giá trị — **thêm / sửa / xoá / ẩn hiện / chọn icon** | Quản lý hàng hóa |
-| Thư viện | Upload ảnh/video/tệp, xem lưới/danh sách, chọn nhiều, xóa hàng loạt, xem lớn | Quản lý hàng hóa |
-| Kho hàng | Tồn đa kho (**sửa/xoá mục tồn**), **thêm/sửa/xoá/bật-tắt kho**, phiếu nhập/điều chỉnh/chuyển kho, lịch sử xuất nhập | Thủ kho |
-| Thanh toán | Đối soát thu tiền, hoàn tiền, **quản lý phương thức: thêm/sửa/xoá/bật-tắt** | Kế toán |
-| Vận chuyển | Vận đơn, hành trình, **quản lý hình thức giao: thêm/sửa/xoá/bật-tắt** + phí ship | Bộ phận giao hàng |
-| Khuyến mãi | Mã giảm giá và chương trình sale — **thêm/sửa/xoá/bật-tắt**, xem lượt đã dùng | Marketing |
-| Người dùng | Tab Khách hàng / Nhân sự riêng, **sửa hồ sơ, gán/gỡ vai trò, khoá/xoá tài khoản**, xem bảng quyền | Quản trị nhân sự |
-| Đánh giá & Đổi trả | Duyệt đánh giá sao, xử lý yêu cầu trả hàng | CSKH |
-| Hóa đơn & Dòng tiền | Xuất hóa đơn VAT, ghi thu/chi | Kế toán |
-| Marketing | Chiến dịch, banner, soạn + gửi email HTML hàng loạt qua SMTP | Marketing |
-| Hệ thống | Cấu hình, thông báo, nhật ký thao tác (ai làm gì, khi nào) | Quản trị hệ thống |
-
-Tài khoản khách hàng đăng nhập nhầm vào đây sẽ thấy trang từ chối 403.
+Chạy kèm backend ([../backend](../backend)) và web bán hàng ([../client](../client))
+trong cùng một stack Docker.
 
 ## Chạy
+
+Cách nhanh nhất — dựng cả stack (xem [`../backend/README.md`](../backend/README.md)):
+
+```powershell
+cd ..\backend
+docker compose --env-file .env.docker up -d --build
+```
+
+Mở <http://127.0.0.1:8080>, đăng nhập `admin@example.com` / `Admin123!`.
+
+Chạy riêng để phát triển:
+
 ```powershell
 npm install
-Copy-Item .env.example .env   # sửa VITE_API_BASE nếu API ở máy khác
-npm run dev                   # mở http://localhost:5173
-npm run build                 # đóng gói thư mục dist/ để đưa lên hosting tĩnh
+Copy-Item .env.example .env    # sửa VITE_API_BASE nếu API ở máy khác
+npm run dev                    # http://localhost:5173
+npm run build                  # đóng gói dist/ để đưa lên hosting tĩnh
 ```
-Mặc định gọi API Docker local (`http://127.0.0.1:3000/api`), file media ở `http://127.0.0.1:9000/unimate`.
-Đăng nhập: `admin@example.com` / `Admin123!`.
 
-Triển khai cùng stack Docker có sẵn (`ADMIN_DOMAIN`, `ADMIN_API_BASE`, `ADMIN_FILES_BASE`, xem `backend/docs/DOCKER.md`).
+| Biến môi trường | Ý nghĩa |
+|---|---|
+| `VITE_API_BASE` | Địa chỉ API, kèm `/api` |
+| `VITE_FILES_BASE` | URL công khai của file media (khớp `S3_PUBLIC_URL` backend) |
 
-## Trải nghiệm
-- Responsive đầy đủ: PC sidebar cố định, tablet/mobile sidebar trượt + bảng cuộn ngang.
-- Dữ liệu tự làm mới sau mỗi thao tác + tự cập nhật nền 30–60s (đơn, kho, thanh toán...).
-- Mọi dialog đều độc lập: đóng cái trên không sập cái dưới; lỗi trang không trắng cả app.
-- Mọi thao tác xoá đều **hỏi lại bằng hộp thoại xác nhận**; nếu dữ liệu đang được dùng chỗ khác,
-  API trả 409 kèm `can_force` và giao diện hỏi thêm một lần nữa trước khi xoá cứng.
-- Nút bật/tắt nhanh (mắt) cho danh mục, thương hiệu, sản phẩm, kho, phương thức thanh toán,
-  hình thức giao hàng, mã giảm giá và chương trình khuyến mãi.
+Đổi 2 biến này trong `.env.docker` (`ADMIN_API_BASE`, `ADMIN_FILES_BASE`) thì phải
+build lại image — biến được nướng vào lúc build.
 
-## Cấu trúc (cho dev bảo trì)
+## Menu
+
+| Menu | Làm được gì |
+|---|---|
+| Tổng quan | Doanh thu, biểu đồ 7 ngày, top sản phẩm, tồn sắp hết |
+| Đơn hàng | Lọc, xem chi tiết, chuyển trạng thái, ghi chú |
+| Tạo đơn | Nhân viên đặt hộ khách gọi điện: khách → hàng → giao nhận → chốt |
+| Sản phẩm | Thêm/sửa, biến thể (màu/size/giá), ảnh, ẩn hiện, xoá mềm hoặc xoá vĩnh viễn |
+| Danh mục | Danh mục, thương hiệu, thuộc tính + giá trị — thêm/sửa/xoá/bật tắt |
+| Thư viện | Upload ảnh/video/tệp, xem lưới hoặc danh sách, chọn nhiều, xoá hàng loạt |
+| Kho hàng | Tồn đa kho, phiếu nhập/điều chỉnh/chuyển kho, lịch sử xuất nhập |
+| Thanh toán | Đối soát, hoàn tiền, quản lý phương thức thanh toán |
+| Vận chuyển | Vận đơn, hành trình, quản lý hình thức giao và phí ship |
+| Khuyến mãi | Mã giảm giá và chương trình sale, xem lượt đã dùng |
+| Người dùng | Tách riêng khách hàng và nhân sự, gán/gỡ vai trò, khoá tài khoản |
+| Đánh giá & Đổi trả | Duyệt đánh giá, xử lý yêu cầu trả hàng |
+| Hóa đơn & Dòng tiền | Xuất hóa đơn VAT, ghi thu chi |
+| Marketing | Chiến dịch, banner, soạn và gửi email HTML hàng loạt |
+| Hệ thống | Cấu hình, thông báo, nhật ký thao tác |
+
+Tài khoản khách hàng đăng nhập nhầm vào đây sẽ thấy trang 403.
+
+## Cấu trúc
+
 ```
 src/
-├── api/client.js      # gọi API: tự gắn token, tự làm mới phiên khi hết hạn, định dạng tiền/ngày
-├── auth/              # đăng nhập/đăng xuất, khôi phục phiên khi F5, kiểm tra quyền can(...)
-├── lib/ + components/ui/  # linh kiện shadcn: nút, thẻ, bảng, dialog, form, ConfirmDialog
-├── components/        # menu (quyền từng mục), khung layout, chọn nhanh (hàng/đơn/ảnh), lightbox
-├── utils/status.js    # từ điển trạng thái + vai trò tiếng Việt
-├── pages/             # 16 trang, mỗi trang 1 file theo đúng menu ở trên
-└── App.jsx            # điều hướng + chặn quyền (thiếu quyền → 403)
+├── api/client.js       gắn token, tự làm mới phiên khi hết hạn, định dạng tiền/ngày
+├── auth/               đăng nhập/đăng xuất, khôi phục phiên khi F5, hàm can(quyền)
+├── components/
+│   ├── menu.jsx        danh sách menu kèm quyền đi kèm
+│   ├── ui/             nút, thẻ, bảng, dialog, form, ô nhập, ConfirmDialog
+│   ├── pickers.jsx     chọn nhanh hàng / đơn / ảnh trong thư viện
+│   └── Lightbox.jsx    xem ảnh cỡ lớn
+├── pages/              16 trang, mỗi menu 1 file
+└── App.jsx             điều hướng + chặn quyền (thiếu quyền → 403)
 ```
-Thêm mục menu mới = thêm 1 dòng vào `MENU` (`components/menu.jsx`) + 1 route trong
-`App.jsx` + 1 file trong `pages/`. Backend API xem tại `backend/docs/API.md`.
+
+Thêm menu mới = thêm 1 dòng vào `MENU` (`components/menu.jsx`) + 1 route trong `App.jsx`
++ 1 file trong `pages/`. Danh sách endpoint: [`../backend/docs/API.md`](../backend/docs/API.md).
+
+## Ghi chú cho dev
+
+- Mọi thao tác xoá đều hỏi lại bằng hộp thoại xác nhận. Nếu dữ liệu đang được dùng ở
+  nơi khác, API trả `409` kèm `can_force` và giao diện hỏi thêm một lần nữa.
+- Nút bật/tắt nhanh (con mắt) cho danh mục, thương hiệu, sản phẩm, kho, phương thức
+  thanh toán, hình thức giao, mã giảm giá và chương trình khuyến mãi.
+- Dữ liệu tự làm mới sau mỗi thao tác, và tự cập nhật nền 30–60 giây.
+- Responsive: PC sidebar cố định, tablet/mobile sidebar trượt, bảng cuộn ngang.
