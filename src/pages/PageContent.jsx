@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Upload } from 'lucide-react';
 import { toast } from 'sonner';
 import { api, errMsg } from '../api/client';
 import { Button } from '../components/ui/button';
 import { Input, Textarea, Field } from '../components/ui/input';
 import { Tabs } from '../components/ui/misc';
+import { MediaPicker } from '../components/pickers';
 
 const KEYS = {
   about: 'page.about',
@@ -104,6 +106,49 @@ export default function PageContent() {
     if (tab === 'stores') {
       return data.stores.map((s, i) => (
         <div key={i} className="mb-3 rounded-lg border border-slate-200 p-3">
+          <div className="mb-3 flex flex-wrap items-center gap-3">
+            {s.image ? (
+              <img src={s.image} alt="" className="size-16 shrink-0 rounded-lg border border-slate-200 object-cover" />
+            ) : (
+              <span className="grid size-16 shrink-0 place-items-center rounded-lg bg-slate-100 text-xl font-semibold text-slate-400">
+                {(s.name || '?').trim().charAt(0).toUpperCase()}
+              </span>
+            )}
+            <div className="flex flex-wrap items-center gap-2">
+              <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-1.5 text-sm shadow-sm hover:bg-slate-50">
+                <Upload className="size-4" />Tải ảnh lên
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={async (e) => {
+                    const file = e.target.files[0];
+                    e.target.value = '';
+                    if (!file) return;
+                    try {
+                      const fd = new FormData();
+                      fd.append('file', file);
+                      const { data: media } = await api.post('/media/upload', fd);
+                      setList('stores', i, { image: media.url });
+                      toast.success('Đã tải ảnh lên');
+                    } catch (err) { toast.error(errMsg(err)); }
+                  }}
+                />
+              </label>
+              <MediaPicker
+                value={null}
+                kind="image"
+                onChange={async (mediaId) => {
+                  if (!mediaId) return;
+                  try {
+                    const { data: media } = await api.get(`/media/${mediaId}/url`);
+                    setList('stores', i, { image: media.url });
+                  } catch (err) { toast.error(errMsg(err)); }
+                }}
+              />
+              {s.image && <Button size="sm" variant="outline" onClick={() => setList('stores', i, { image: '' })}>Xoá ảnh</Button>}
+            </div>
+          </div>
           <div className="grid gap-2 sm:grid-cols-2">
             <Field label="Tên cửa hàng">
               <Input value={s.name || ''} onChange={(e) => setList('stores', i, { name: e.target.value })} />
@@ -169,7 +214,7 @@ export default function PageContent() {
         <div>
           {listEditors}
           <div className="mt-1 flex gap-2">
-            <Button variant="outline" onClick={() => setAt('stores', [...data.stores, { name: '', address: '', phone: '', hours: '' }])}>
+            <Button variant="outline" onClick={() => setAt('stores', [...data.stores, { name: '', address: '', phone: '', hours: '', image: '' }])}>
               Thêm cửa hàng
             </Button>
           </div>
