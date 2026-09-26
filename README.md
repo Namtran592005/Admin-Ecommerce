@@ -52,7 +52,7 @@ build lại image — biến được nướng vào lúc build.
 | Người dùng | Tách riêng khách hàng và nhân sự, gán/gỡ vai trò, khoá tài khoản, **đặt lại mật khẩu** (tự sinh mật khẩu ngẫu nhiên, thu hồi phiên cũ, bắt đổi khi đăng nhập lại) |
 | Đánh giá & Đổi trả | Duyệt đánh giá, xử lý yêu cầu trả hàng |
 | Hóa đơn & Dòng tiền | Xuất hóa đơn VAT, ghi thu chi |
-| Marketing | Chiến dịch (thêm/sửa/xoá/bật tắt), banner (thêm/sửa/xoá/bật tắt, đổi thứ tự, ảnh riêng cho mobile), soạn và gửi email HTML hàng loạt |
+| Marketing | Chiến dịch (thêm/sửa/xoá/bật tắt), banner (thêm/sửa/xoá/bật tắt, đổi thứ tự, dùng chung một media cho mọi màn hình, hỗ trợ video), soạn và gửi email HTML hàng loạt |
 | Hệ thống | Cấu hình, thông báo, nhật ký thao tác |
 
 Tài khoản khách hàng đăng nhập nhầm vào đây sẽ thấy trang 403.

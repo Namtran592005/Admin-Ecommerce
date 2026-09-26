@@ -17,9 +17,19 @@ const BANNER_STATUSES = ['draft', 'active', 'inactive'];
 const EMPTY_CAMP = { name: '', description: '', status: 'draft' };
 const EMPTY_BANNER = { title: '', link_url: '', alt_text: '', sort_order: 0, status: 'active' };
 
-function Thumb({ src, alt }) {
+const isVideoMime = (m) => (m?.mime_type || '').startsWith('video/');
+
+function Thumb({ src, alt, mime }) {
   if (!src) {
-    return <span className="grid h-11 w-20 place-items-center rounded border border-dashed border-slate-300 text-[10px] text-slate-400">Chưa có ảnh</span>;
+    return <span className="grid h-11 w-20 place-items-center rounded border border-dashed border-slate-300 text-[10px] text-slate-400">Chưa có media</span>;
+  }
+  if (isVideoMime({ mime_type: mime })) {
+    return (
+      <span className="relative block h-11 w-20 overflow-hidden rounded border border-slate-200 bg-slate-900">
+        <video src={src} muted playsInline preload="metadata" className="size-full object-cover" />
+        <span className="absolute bottom-0 left-0 rounded-tr bg-slate-900/80 px-1 py-px text-[9px] font-semibold text-white">VIDEO</span>
+      </span>
+    );
   }
   return <img src={src} alt={alt || ''} className="h-11 w-20 rounded border border-slate-200 bg-white object-contain" />;
 }
@@ -112,7 +122,6 @@ export default function Marketing() {
   const [bannerEditId, setBannerEditId] = useState(null);
   const [banner, setBanner] = useState(EMPTY_BANNER);
   const [bannerMedia, setBannerMedia] = useState(null);
-  const [bannerMobile, setBannerMobile] = useState(null);
   const [bannerSaving, setBannerSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
@@ -150,7 +159,6 @@ export default function Marketing() {
     setBannerEditId(null);
     setBanner(EMPTY_BANNER);
     setBannerMedia(null);
-    setBannerMobile(null);
     setBannerOpen(true);
   };
   const openEditBanner = (row) => {
@@ -163,12 +171,11 @@ export default function Marketing() {
       status: row.status || 'draft',
     });
     setBannerMedia(row.image_media_id || null);
-    setBannerMobile(row.mobile_image_media_id || null);
     setBannerOpen(true);
   };
   const saveBanner = async () => {
     if (!banner.title.trim()) return toast.error('Nhập tiêu đề banner');
-    if (!bannerMedia) return toast.warning('Chọn ảnh banner');
+    if (!bannerMedia) return toast.warning('Chọn ảnh hoặc video banner');
     setBannerSaving(true);
     const payload = {
       title: banner.title.trim(),
@@ -177,7 +184,6 @@ export default function Marketing() {
       sort_order: Number(banner.sort_order) || 0,
       status: banner.status,
       image_media_id: bannerMedia,
-      mobile_image_media_id: bannerMobile || null,
     };
     try {
       if (bannerEditId) {
@@ -266,20 +272,17 @@ export default function Marketing() {
         </>)}
         {tab === 'b' && (<>
           <p className="mb-2 text-xs text-slate-500">
-            Thứ tự trên bảng là thứ tự hiển thị trên trang chủ. Ảnh mobile dùng cho màn hình nhỏ — nên có tỉ lệ 16:9 riêng.
+            Thứ tự trên bảng là thứ tự hiển thị trên trang chủ. Mỗi banner dùng chung một media cho mọi màn hình — chọn ảnh 16:9, hoặc video mp4/webm sẽ tự chạy không tiếng.
           </p>
           <TableWrap><table className="w-full text-sm">
             <THead><Tr>
-              <Th className="w-10">#</Th><Th>Ảnh</Th><Th>Tiêu đề</Th><Th>Liên kết</Th><Th>Trạng thái</Th><Th className="text-right">Thao tác</Th>
+              <Th className="w-10">#</Th><Th>Media</Th><Th>Tiêu đề</Th><Th>Liên kết</Th><Th>Trạng thái</Th><Th className="text-right">Thao tác</Th>
             </Tr></THead>
             <tbody>{banners.map((b, i) => (
               <Tr key={b.id}>
                 <Td className="text-slate-400">{i + 1}</Td>
                 <Td>
-                  <div className="flex items-center gap-1.5">
-                    <Thumb src={b.image_key ? mediaUrl(b.image_key) : null} alt={b.alt_text} />
-                    {b.mobile_image_key && <Thumb src={mediaUrl(b.mobile_image_key)} alt="" />}
-                  </div>
+                  <Thumb src={b.image_key ? mediaUrl(b.image_key) : null} alt={b.alt_text} mime={b.mime_type} />
                 </Td>
                 <Td>
                   <div className="font-medium">{b.title}</div>
@@ -338,11 +341,8 @@ export default function Marketing() {
             <Field label="Tiêu đề *" className="sm:col-span-2">
               <Input value={banner.title} onChange={(e) => setBanner({ ...banner, title: e.target.value })} />
             </Field>
-            <Field label="Ảnh desktop *" hint="Tỉ lệ 16:9, hiển thị trên PC">
-              <MediaPicker value={bannerMedia} onChange={setBannerMedia} kind="image" />
-            </Field>
-            <Field label="Ảnh mobile" hint="Tùy chọn — dùng cho điện thoại">
-              <MediaPicker value={bannerMobile} onChange={setBannerMobile} kind="image" />
+            <Field label="Ảnh hoặc video *" hint="Dùng chung mọi màn hình. Video mp4/webm tự chạy không tiếng, không có nút điều khiển" className="sm:col-span-2">
+              <MediaPicker value={bannerMedia} onChange={setBannerMedia} kind="banner" />
             </Field>
             <Field label="Liên kết" hint="Ví dụ: /khuyen-mai">
               <Input value={banner.link_url} onChange={(e) => setBanner({ ...banner, link_url: e.target.value })} />

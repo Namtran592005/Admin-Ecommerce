@@ -75,7 +75,7 @@ export function OrderPicker({ value, onChange, placeholder = 'Tìm mã đơn ORD
   );
 }
 
-// Chọn ảnh từ thư viện (xem trước). kind: 'all' | 'image'
+// Chọn media từ thư viện (xem trước). kind: 'all' | 'image' | 'banner' (ảnh + video)
 export function MediaPicker({ value, onChange, kind = 'all' }) {
   const [open, setOpen] = useState(false);
   const [rows, setRows] = useState([]);
@@ -87,19 +87,24 @@ export function MediaPicker({ value, onChange, kind = 'all' }) {
     } catch (e) { toast.error(errMsg(e)); }
   };
   const isImg = (m) => (m.mime_type || '').startsWith('image/');
+  const isVid = (m) => (m.mime_type || '').startsWith('video/');
+  const okKind = (m) => (kind === 'all' ? true
+    : kind === 'image' ? isImg(m)
+    : kind === 'banner' ? isImg(m) || isVid(m) : false);
   const filtered = rows.filter((m) =>
-    (kind === 'all' || (kind === 'image' && isImg(m))) &&
+    okKind(m) &&
     (!q || (m.original_name || '').toLowerCase().includes(q.toLowerCase())));
+  const noun = kind === 'banner' ? 'ảnh hoặc video' : kind === 'image' ? 'ảnh' : 'media';
   return (
     <>
       <div className="flex items-center gap-2">
-        <Input value={value || ''} placeholder="Chưa chọn ảnh" readOnly className="w-28" />
+        <Input value={value || ''} placeholder="Chưa chọn media" readOnly className="w-28" />
         <Button type="button" variant="outline" onClick={() => { setOpen(true); load(); }}>Chọn từ thư viện</Button>
         {value && <Button type="button" variant="ghost" onClick={() => onChange(null)}><X />Xóa</Button>}
       </div>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="sm:max-w-3xl">
-          <DialogHeader><DialogTitle>Chọn ảnh</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>Chọn {noun}</DialogTitle></DialogHeader>
           <Input placeholder="Tìm theo tên file..." value={q} onChange={(e) => setQ(e.target.value)} className="max-w-xs" />
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
             {filtered.map((m) => (
@@ -107,12 +112,19 @@ export function MediaPicker({ value, onChange, kind = 'all' }) {
                 className="overflow-hidden rounded-lg border text-left hover:border-brand-500">
                 {isImg(m)
                   ? <img src={mediaUrl(m.object_key)} alt="" className="h-24 w-full object-cover" loading="lazy" />
-                  : <span className="flex h-24 items-center justify-center bg-slate-100 text-xs text-slate-500">{m.mime_type}</span>}
+                  : isVid(m)
+                    ? (
+                      <span className="relative block h-24 w-full bg-slate-900">
+                        <video src={mediaUrl(m.object_key)} muted playsInline preload="metadata" className="size-full object-cover" />
+                        <span className="absolute bottom-1 left-1 rounded bg-slate-900/80 px-1.5 py-px text-[10px] font-semibold text-white">VIDEO</span>
+                      </span>
+                    )
+                    : <span className="flex h-24 items-center justify-center bg-slate-100 text-xs text-slate-500">{m.mime_type}</span>}
                 <span className="block truncate px-2 py-1 text-xs">#{m.id} {m.original_name}</span>
               </button>
             ))}
           </div>
-          {!filtered.length && <p className="py-6 text-center text-sm text-slate-500">Không có ảnh phù hợp. Hãy tải lên ở trang Thư viện trước.</p>}
+          {!filtered.length && <p className="py-6 text-center text-sm text-slate-500">Không có {noun} phù hợp. Hãy tải lên ở trang Thư viện trước.</p>}
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>Đóng</Button>
           </DialogFooter>
