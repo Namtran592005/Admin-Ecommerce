@@ -3,7 +3,7 @@ import { Search, Plus, Trash2, Check, ArrowLeft, ArrowRight } from 'lucide-react
 import { toast } from 'sonner';
 import { api, errMsg, fmtVND } from '../api/client';
 import { Button } from '../components/ui/button';
-import { Input } from '../components/ui/input';
+import { Input, Select } from '../components/ui/input';
 import { Field } from '../components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { TableWrap, THead, Tr, Th, Td, Empty } from '../components/ui/table';
@@ -239,15 +239,15 @@ export default function OrderCreate() {
                 </label>
               ))}
               <label className="grid gap-1.5 text-sm font-medium text-slate-700">Thanh toán
-                <select className="flex h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm" value={payCode} onChange={(e) => setPayCode(e.target.value)}>
+                <Select value={payCode} onChange={(e) => setPayCode(e.target.value)}>
                   {payMethods.map((m) => <option key={m.code} value={m.code}>{m.name}</option>)}
-                </select>
+                </Select>
               </label>
               <label className="grid gap-1.5 text-sm font-medium text-slate-700">Giao hàng
-                <select className="flex h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm" value={shipCode} onChange={(e) => setShipCode(e.target.value)}>
+                <Select value={shipCode} onChange={(e) => setShipCode(e.target.value)}>
                   <option value="">Mặc định</option>
                   {shipMethods.map((m) => <option key={m.code} value={m.code}>{m.name} (+{fmtVND(m.base_fee)})</option>)}
-                </select>
+                </Select>
               </label>
               <label className="grid gap-1.5 text-sm font-medium text-slate-700 sm:col-span-2">Mã giảm giá
                 <span className="flex gap-2">

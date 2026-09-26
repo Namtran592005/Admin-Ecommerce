@@ -5,7 +5,7 @@ import { api, errMsg, fmtDate } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import { t, opts } from '../utils/status';
 import { Button } from '../components/ui/button';
-import { Input } from '../components/ui/input';
+import { Input, Select } from '../components/ui/input';
 import { Card, CardContent, Badge } from '../components/ui/card';
 import { TableWrap, THead, Tr, Th, Td, Empty, Toolbar, PageHeader } from '../components/ui/table';
 import { Tabs } from '../components/ui/misc';
@@ -53,10 +53,10 @@ export default function Reviews() {
                 <Td><Badge>{t('ret', r.status)}</Badge></Td>
                 <Td className="whitespace-nowrap">{fmtDate(r.requested_at)}</Td>
                 <Td>{canReturn && (
-                  <select className="h-8 rounded-lg border border-slate-200 bg-white px-2 text-xs" value={r.status}
+                  <Select className="h-8 w-auto text-xs" value={r.status}
                     onChange={(e) => returnStatus(r.id, e.target.value)}>
                     {opts('ret', ['requested', 'approved', 'rejected', 'customer_shipping', 'received', 'inspecting', 'accepted', 'refunded', 'cancelled']).map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                  </select>
+                  </Select>
                 )}</Td>
               </Tr>
             ))}</tbody>
@@ -77,11 +77,11 @@ export default function Reviews() {
                 <Td>{r.is_verified_purchase ? <Badge color="green">Có</Badge> : '—'}</Td>
                 <Td className="whitespace-nowrap">{fmtDate(r.created_at)}</Td>
                 <Td>{canReview && (
-                  <select className="h-8 rounded-lg border border-slate-200 bg-white px-2 text-xs" defaultValue=""
+                  <Select className="h-8 w-auto text-xs" defaultValue=""
                     onChange={(e) => e.target.value && reviewStatus(r.id, e.target.value)}>
                     <option value="">Duyệt...</option>
                     {opts('review', ['pending', 'published', 'hidden', 'rejected']).map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                  </select>
+                  </Select>
                 )}</Td>
               </Tr>
             ))}</tbody>

@@ -11,7 +11,6 @@ import { TableWrap, THead, Tr, Th, Td, Empty, PageHeader } from '../components/u
 import { Tabs, ConfirmDialog, IconButton, RowActions, StatusBadge } from '../components/ui/misc';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
 
-const inputCls = 'flex h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm shadow-sm';
 const SHIP_FLOW = ['pending', 'ready', 'picked_up', 'in_transit', 'out_for_delivery', 'delivered', 'failed', 'returned', 'cancelled'];
 const isActive = (value) => Number(value) === 1;
 const methodPayload = (value = {}) => ({
@@ -211,10 +210,10 @@ export default function Shipping() {
           <DialogHeader><DialogTitle>Vận đơn #{sel?.id} (đơn {sel?.order_id})</DialogTitle></DialogHeader>
           {sel && (<>
             {writable && (
-              <select className={inputCls} style={{ maxWidth: 260 }} value="" onChange={(e) => e.target.value && setStatus(e.target.value)}>
+              <Select style={{ maxWidth: 260 }} value="" onChange={(e) => e.target.value && setStatus(e.target.value)}>
                 <option value="">Chuyển trạng thái...</option>
                 {opts('ship', SHIP_FLOW).map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-              </select>
+              </Select>
             )}
             <ol className="mt-2 grid gap-2">
               {track.map((tr) => (

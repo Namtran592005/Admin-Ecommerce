@@ -5,14 +5,15 @@ import { api, errMsg, fmtVND, fmtDate } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import { t, opts } from '../utils/status';
 import { Button } from '../components/ui/button';
-import { Input } from '../components/ui/input';
+import { Input, Select } from '../components/ui/input';
 import { Card, CardContent, Badge } from '../components/ui/card';
 import { TableWrap, THead, Tr, Th, Td, Pagination, Empty, Toolbar, PageHeader } from '../components/ui/table';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
+import { ConfirmDialog } from '../components/ui/misc';
 
+const DANGER_STATUS = new Set(['cancelled', 'returned', 'refunded']);
 const NEXT = { pending: ['confirmed', 'cancelled'], confirmed: ['processing', 'cancelled'], processing: ['packed', 'cancelled'], packed: ['shipping', 'cancelled'], shipping: ['delivered', 'returned'], delivered: ['completed', 'returned'], completed: [], cancelled: [], returned: ['refunded'], refunded: [] };
 
-const inputCls = 'flex h-9 rounded-lg border border-slate-200 bg-white px-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40';
 
 export default function Orders() {
   const { can } = useAuth();
@@ -22,6 +23,8 @@ export default function Orders() {
   const [pg, setPg] = useState({ page: 1, limit: 15, total: 0 });
   const [f, setF] = useState({ status: '', payment_status: '', search: '' });
   const [sel, setSel] = useState(null);
+  const [statusTarget, setStatusTarget] = useState(null);
+  const [statusBusy, setStatusBusy] = useState(false);
   const [tab, setTab] = useState('info');
   const [note, setNote] = useState('');
   const pgRef = useRef(pg);
@@ -44,7 +47,22 @@ export default function Orders() {
     try { const { data } = await api.get(`/orders/${id}`); setSel(data); setTab('info'); }
     catch (e) { if (!quiet) toast.error(errMsg(e)); }
   };
-  const changeStatus = async (status) => {
+  const changeStatus = async () => {
+    if (!statusTarget) return;
+    setStatusBusy(true);
+    try {
+      await api.patch(`/orders/${sel.id}/status`, { status: statusTarget });
+      toast.success('Đã chuyển: ' + t('order', statusTarget));
+      setStatusTarget(null);
+      open(sel.id, true); load(pg.page, true);
+    } catch (e) { toast.error(errMsg(e)); }
+    finally { setStatusBusy(false); }
+  };
+  const askStatus = (status) => {
+    if (DANGER_STATUS.has(status)) setStatusTarget(status);
+    else changeStatusDirect(status);
+  };
+  const changeStatusDirect = async (status) => {
     try {
       await api.patch(`/orders/${sel.id}/status`, { status });
       toast.success('Đã chuyển: ' + t('order', status));
@@ -70,14 +88,14 @@ export default function Orders() {
       <PageHeader title="Đơn hàng" />
       <Card><CardContent className="pt-4">
         <Toolbar>
-          <select className={inputCls} style={{ width: 170 }} value={f.status} onChange={(e) => setF({ ...f, status: e.target.value })}>
+          <Select style={{ width: 170 }} value={f.status} onChange={(e) => setF({ ...f, status: e.target.value })}>
             <option value="">Trạng thái</option>
             {opts('order', Object.keys(NEXT)).map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-          </select>
-          <select className={inputCls} style={{ width: 170 }} value={f.payment_status} onChange={(e) => setF({ ...f, payment_status: e.target.value })}>
+          </Select>
+          <Select style={{ width: 170 }} value={f.payment_status} onChange={(e) => setF({ ...f, payment_status: e.target.value })}>
             <option value="">Thanh toán</option>
             {opts('pay', ['unpaid', 'pending', 'paid', 'failed', 'refunded']).map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-          </select>
+          </Select>
           <Input placeholder="Mã đơn ORD..." value={f.search} className="max-w-[220px]"
             onChange={(e) => setF({ ...f, search: e.target.value })} onKeyDown={(e) => e.key === 'Enter' && load(1)} />
           <Button onClick={() => load(1)}>Lọc</Button>
@@ -166,12 +184,25 @@ export default function Orders() {
               </div>
               <div className="mt-2 flex gap-2">
                 <Input placeholder="Thêm ghi chú..." value={note} onChange={(e) => setNote(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addNote()} />
-                <Button onClick={addNote}>Lưu</Button>
+                <Button onClick={addNote} disabled={!note.trim()}>Lưu</Button>
               </div>
             </>)}
           </>)}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSel(null)}>Đóng</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={!!statusTarget}
+        onOpenChange={(next) => !next && setStatusTarget(null)}
+        title={`Chuyển đơn sang “${t('order', statusTarget || '')}”?`}
+        description={`Đơn ${sel?.order_number || ''} sẽ chuyển sang trạng thái “${t('order', statusTarget || '')}”. Thao tác này ảnh hưởng tới kho và đối soát, không thể hoàn tác.`}
+        confirmText="Chuyển trạng thái"
+        busy={statusBusy}
+        onConfirm={changeStatus}
+      />
     </div>
   );
 }

@@ -5,6 +5,7 @@ const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null); // { id, email, roles[], permissions[] }
+  const [mustChangePassword, setMustChangePassword] = useState(false);
   const [ready, setReady] = useState(false);
   const booted = useRef(false);
 
@@ -12,6 +13,7 @@ export function AuthProvider({ children }) {
     try { await api.post('/auth/logout'); } catch { /* ignore */ }
     clearTokens();
     setUser(null);
+    setMustChangePassword(false);
   }, []);
 
   useEffect(() => { setOnAuthFail(() => { clearTokens(); setUser(null); }); }, []);
@@ -22,7 +24,13 @@ export function AuthProvider({ children }) {
     if (data.refreshToken) setRefreshToken(data.refreshToken);
     const me = await api.get('/auth/me');
     setUser(me.data.user);
+    setMustChangePassword(Boolean(me.data.mustChangePassword ?? data.mustChangePassword));
     return me.data.user;
+  }, []);
+
+  const changePassword = useCallback(async (oldPassword, newPassword) => {
+    await api.put('/auth/password', { old_password: oldPassword, new_password: newPassword });
+    setMustChangePassword(false);
   }, []);
 
   // F5 không văng login: thử xoay refresh cookie (httpOnly, còn hạn 30 ngày)
@@ -37,6 +45,7 @@ export function AuthProvider({ children }) {
         if (data.refreshToken) setRefreshToken(data.refreshToken);
         const me = await api.get('/auth/me');
         setUser(me.data.user);
+        setMustChangePassword(Boolean(me.data.mustChangePassword));
       } catch {
         clearTokens();
         setUser(null);
@@ -53,7 +62,7 @@ export function AuthProvider({ children }) {
   }, [user]);
 
   return (
-    <AuthContext.Provider value={{ user, setUser, login, logout, can, ready }}>
+    <AuthContext.Provider value={{ user, setUser, login, logout, can, ready, mustChangePassword, changePassword }}>
       {children}
     </AuthContext.Provider>
   );

@@ -5,8 +5,8 @@ import { api, errMsg, fmtDate } from '../api/client';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Card, CardContent } from '../components/ui/card';
-import { Toolbar, Empty } from '../components/ui/table';
-import { Tabs } from '../components/ui/misc';
+import { Toolbar, Empty, PageHeader } from '../components/ui/table';
+import { Tabs, ConfirmDialog, IconButton } from '../components/ui/misc';
 import Lightbox from '../components/Lightbox';
 import { mediaUrl } from '../components/pickers';
 import { cn } from '../lib/utils';
@@ -36,6 +36,10 @@ export default function Media() {
   const [tab, setTab] = useState('all');
   const [view, setView] = useState('list');
   const [selected, setSelected] = useState([]);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleting, setDeleting] = useState(false);
+  const [bulkTarget, setBulkTarget] = useState(null);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
   const [lightbox, setLightbox] = useState(null);
 
   const load = (quiet = false) => {
@@ -54,13 +58,17 @@ export default function Media() {
     } catch (e) { toast.error(errMsg(e)); }
   };
 
-  const remove = async (id) => {
-    try { await api.delete(`/media/${id}`); toast.success('Đã xóa'); load(true); }
+  const remove = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try { await api.delete(`/media/${deleteTarget.id}`); toast.success('Đã xóa'); setDeleteTarget(null); load(true); }
     catch (e) { toast.error(errMsg(e)); }
+    finally { setDeleting(false); }
   };
 
   const removeSelected = async () => {
     if (!selected.length) return;
+    setBulkDeleting(true);
     let ok = 0, blocked = 0;
     for (const id of selected) {
       try { await api.delete(`/media/${id}`); ok++; }
@@ -117,7 +125,7 @@ export default function Media() {
         {selected.length > 0 && (
           <div className="mb-3 flex items-center gap-2 rounded-lg bg-blue-50 px-3 py-2 text-sm">
             <b>Đã chọn {selected.length}</b>
-            <Button size="sm" variant="destructive" onClick={removeSelected}><Trash2 />Xóa đã chọn</Button>
+            <Button size="sm" variant="destructive" onClick={() => setBulkTarget(true)} disabled={bulkDeleting}><Trash2 />Xóa đã chọn</Button>
             <Button size="sm" variant="ghost" onClick={() => setSelected([])}>Bỏ chọn</Button>
           </div>
         )}
@@ -147,7 +155,7 @@ export default function Media() {
                       {selected.includes(m.id) ? 'Đã chọn' : 'Chọn'}
                     </Button>
                     <Button size="sm" variant="outline" onClick={() => copyUrl(m.object_key)}>Chép liên kết</Button>
-                    <Button size="sm" variant="ghost" onClick={() => remove(m.id)}><Trash2 className="text-red-600" /></Button>
+                    <IconButton label="Xóa file" onClick={() => setDeleteTarget(m)} disabled={deleting}><Trash2 className="text-red-600" /></IconButton>
                   </div>
                 </div>
               </div>
@@ -175,7 +183,7 @@ export default function Media() {
                     <td className="px-3 py-2 whitespace-nowrap">{fmtDate(m.created_at)}</td>
                     <td className="px-3 py-2"><div className="flex gap-1">
                       <Button size="sm" variant="outline" onClick={() => copyUrl(m.object_key)}>Chép liên kết</Button>
-                      <Button size="sm" variant="ghost" onClick={() => remove(m.id)}><Trash2 className="text-red-600" /></Button>
+                      <IconButton label="Xóa file" onClick={() => setDeleteTarget(m)} disabled={deleting}><Trash2 className="text-red-600" /></IconButton>
                     </div></td>
                   </tr>
                 ))}
@@ -185,6 +193,25 @@ export default function Media() {
         )) : <p className="py-8 text-center text-sm text-slate-400">Chưa có dữ liệu</p>}
       </CardContent></Card>
       <Lightbox items={lbItems} index={lightbox} onClose={() => setLightbox(null)} onNav={setLightbox} />
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={(next) => !next && setDeleteTarget(null)}
+        title="Xóa file khỏi thư viện?"
+        description={`“${deleteTarget?.original_name || ''}” sẽ bị xóa khỏi hệ thống. Nếu đang được dùng ở sản phẩm hoặc banner, thao tác sẽ bị từ chối.`}
+        confirmText="Xóa file"
+        busy={deleting}
+        onConfirm={remove}
+      />
+      <ConfirmDialog
+        open={!!bulkTarget}
+        onOpenChange={(next) => !next && setBulkTarget(null)}
+        title={`Xóa ${selected.length} file đã chọn?`}
+        description="Những file đang được sử dụng sẽ được giữ lại và báo bằng thông báo."
+        confirmText="Xóa đã chọn"
+        busy={bulkDeleting}
+        onConfirm={async () => { await removeSelected(); setBulkTarget(null); }}
+      />
     </div>
   );
 }

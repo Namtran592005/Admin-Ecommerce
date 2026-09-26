@@ -35,9 +35,10 @@ export const Label = ({ className, ...props }) => (
   <label className={cn('text-sm font-medium text-slate-700', className)} {...props} />
 );
 
-export const Field = ({ label, children, className }) => (
+export const Field = ({ label, children, className, hint }) => (
   <div className={cn('grid gap-1.5', className)}>
     {label && <Label>{label}</Label>}
     {children}
+    {hint && <span className="text-xs text-slate-500">{hint}</span>}
   </div>
 );

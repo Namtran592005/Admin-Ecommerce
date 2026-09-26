@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Eye, EyeOff, Pencil, Plus, Star, Trash2, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 import { api, errMsg, fmtVND } from '../api/client';
@@ -7,13 +7,12 @@ import { opts, t } from '../utils/status';
 import { MediaPicker, mediaUrl } from '../components/pickers';
 import Lightbox from '../components/Lightbox';
 import { Button } from '../components/ui/button';
-import { Input, Field } from '../components/ui/input';
+import { Input, Select, Field, Textarea } from '../components/ui/input';
 import { Card, CardContent, Badge } from '../components/ui/card';
 import { Empty, PageHeader, Pagination, TableWrap, THead, Th, Td, Toolbar, Tr } from '../components/ui/table';
 import { ConfirmDialog, IconButton, RowActions, StatusBadge } from '../components/ui/misc';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
 
-const inputCls = 'flex h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm shadow-sm';
 
 function CategoryPicker({ cats, value = [], onChange }) {
   const roots = cats.filter((c) => !c.parent_id);
@@ -72,6 +71,11 @@ export default function Products() {
   const [form, setForm] = useState({});
   const [vform, setVform] = useState({});
   const [saving, setSaving] = useState(false);
+  const [editLoadingId, setEditLoadingId] = useState(null);
+  const editLoadingIdRef = useRef(null);
+  const [variantSaving, setVariantSaving] = useState(false);
+  const [imageDeleteTarget, setImageDeleteTarget] = useState(null);
+  const [imageDeleting, setImageDeleting] = useState(false);
   const [statusBusy, setStatusBusy] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [forceDeleteTarget, setForceDeleteTarget] = useState(null);
@@ -109,22 +113,35 @@ export default function Products() {
   };
 
   const startEdit = async (row) => {
+    if (editLoadingId !== null) return;
     if (!row?.id) {
       setForm({ status: 'active' });
       setEditing({});
       return;
     }
+    setEditLoadingId(row.id);
+    editLoadingIdRef.current = row.id;
     try {
       const { data } = await api.get(`/products/${row.id}`);
+      if (editLoadingIdRef.current !== row.id) return;
       setForm({ ...data, category_ids: (data.categories || []).map((category) => category.id) });
       setEditing(data);
     } catch (e) {
       toast.error(errMsg(e));
+    } finally {
+      setEditLoadingId(null);
+      editLoadingIdRef.current = null;
     }
   };
 
   const save = async () => {
-    if (!form.name || form.base_price === undefined || form.base_price === '') return toast.error('Vui nhập tên và giá');
+    if (!String(form.name || '').trim()) return toast.error('Vui nhập tên sản phẩm');
+    if (!(Number(form.base_price) > 0)) return toast.error('Giá bán phải lớn hơn 0');
+    for (const k of ['compare_at_price', 'cost_price', 'weight_grams']) {
+      if (form[k] !== null && form[k] !== '' && form[k] !== undefined && Number(form[k]) < 0) {
+        return toast.error('Các giá trị không được âm');
+      }
+    }
     setSaving(true);
     try {
       if (editing?.id) await api.put(`/products/${editing.id}`, form);
@@ -192,15 +209,20 @@ export default function Products() {
   };
 
   const addVariant = async () => {
-    if (!vform.sku || vform.price === undefined) return toast.error('Vui nhập SKU và giá');
+    if (variantSaving) return;
+    if (!String(vform.sku || '').trim()) return toast.error('Vui nhập SKU');
+    if (!(Number(vform.price) > 0)) return toast.error('Giá biến thể phải lớn hơn 0');
+    setVariantSaving(true);
     try {
-      await api.post(`/products/${detail.id}/variants`, vform);
+      await api.post(`/products/${detail.id}/variants`, { ...vform, sku: String(vform.sku).trim() });
       toast.success('Đã thêm biến thể');
       setVform({});
       openDetail(detail.id, true);
       load(pg.page, true);
     } catch (e) {
       toast.error(errMsg(e));
+    } finally {
+      setVariantSaving(false);
     }
   };
 
@@ -228,13 +250,18 @@ export default function Products() {
     }
   };
 
-  const deleteImage = async (id) => {
+  const deleteImage = async () => {
+    if (!imageDeleteTarget) return;
+    setImageDeleting(true);
     try {
-      await api.delete(`/product-images/${id}`);
+      await api.delete(`/product-images/${imageDeleteTarget.id}`);
       toast.success('Đã xóa ảnh');
+      setImageDeleteTarget(null);
       openDetail(detail.id, true);
     } catch (e) {
       toast.error(errMsg(e));
+    } finally {
+      setImageDeleting(false);
     }
   };
 
@@ -314,7 +341,7 @@ export default function Products() {
                             >
                               {row.status === 'active' ? <Eye /> : <EyeOff />}
                             </IconButton>
-                            <Button size="sm" variant="outline" onClick={() => startEdit(row)}><Pencil />Sửa</Button>
+                            <Button size="sm" variant="outline" onClick={() => startEdit(row)} disabled={editLoadingId !== null}><Pencil />Sửa</Button>
                           </>
                         )}
                       </RowActions>
@@ -371,8 +398,8 @@ export default function Products() {
             </Section>
 
             <Section title="Giá bán">
-              <Field label="Giá bán (VND) *">
-                <Input type="number" min={0} value={form.base_price ?? ''} onChange={(e) => setF('base_price', Number(e.target.value))} />
+              <Field label="Giá bán (VND) *" hint="Phải lớn hơn 0">
+                <Input type="number" min={1} step={1000} value={form.base_price ?? ''} onChange={(e) => setF('base_price', e.target.value === '' ? '' : Number(e.target.value))} />
               </Field>
               <Field label="Giá so sánh (VND)">
                 <Input type="number" min={0} value={form.compare_at_price ?? ''} onChange={(e) => setF('compare_at_price', e.target.value === '' ? null : Number(e.target.value))} placeholder="Để trống nếu không giảm giá" />
@@ -387,22 +414,22 @@ export default function Products() {
 
             <Section title="Phân loại">
               <Field label="Thương hiệu">
-                <select className={inputCls} value={form.brand_id || ''} onChange={(e) => setF('brand_id', e.target.value ? Number(e.target.value) : null)}>
+                <Select value={form.brand_id || ''} onChange={(e) => setF('brand_id', e.target.value ? Number(e.target.value) : null)}>
                   <option value="">— Chưa chọn —</option>
                   {brands.map((brand) => <option key={brand.id} value={brand.id}>{brand.name}</option>)}
-                </select>
+                </Select>
               </Field>
               <Field label="Trạng thái">
-                <select className={inputCls} value={form.status || 'active'} onChange={(e) => setF('status', e.target.value)}>
+                <Select value={form.status || 'active'} onChange={(e) => setF('status', e.target.value)}>
                   {opts('product', ['draft', 'active', 'inactive', 'archived']).map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-                </select>
+                </Select>
               </Field>
               <Field label="Loại sản phẩm">
-                <select className={inputCls} value={form.product_type || 'physical'} onChange={(e) => setF('product_type', e.target.value)}>
+                <Select value={form.product_type || 'physical'} onChange={(e) => setF('product_type', e.target.value)}>
                   <option value="physical">Hàng vật lý</option>
                   <option value="digital">Sản phẩm số</option>
                   <option value="service">Dịch vụ</option>
-                </select>
+                </Select>
               </Field>
               <div className="sm:col-span-2">
                 <Field label="Danh mục (chọn nhiều)">
@@ -427,7 +454,7 @@ export default function Products() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!detail} onOpenChange={(open) => !open && setDetail(null)}>
+      <Dialog open={!!detail} onOpenChange={(open) => { if (!open) { setDetail(null); setVform({}); setLightbox(null); } }}>
         <DialogContent className="sm:max-w-4xl">
           <DialogHeader>
             <DialogTitle>Chi tiết sản phẩm</DialogTitle>
@@ -481,7 +508,7 @@ export default function Products() {
                     <Field label="SKU *"><Input placeholder="VD: ATS-DO-M" value={vform.sku || ''} onChange={(e) => setVform((value) => ({ ...value, sku: e.target.value }))} className="w-36" /></Field>
                     <Field label="Tên biến thể"><Input placeholder="VD: Đỏ / M" value={vform.name || ''} onChange={(e) => setVform((value) => ({ ...value, name: e.target.value }))} className="w-36" /></Field>
                     <Field label="Giá *"><Input type="number" placeholder="0" min={0} value={vform.price ?? ''} onChange={(e) => setVform((value) => ({ ...value, price: Number(e.target.value) }))} className="w-32" /></Field>
-                    <Button onClick={addVariant}><Plus />Thêm biến thể</Button>
+                    <Button onClick={addVariant} disabled={variantSaving}><Plus />{variantSaving ? 'Đang thêm...' : 'Thêm biến thể'}</Button>
                   </div>
                 )}
               </Section>
@@ -520,9 +547,9 @@ export default function Products() {
                                   <Star /> Chính
                                 </Button>
                               )}
-                              <Button size="sm" variant="ghost" title="Xóa ảnh" className="ml-auto" onClick={() => deleteImage(image.id)}>
+                              <IconButton label="Xóa ảnh" className="ml-auto" onClick={() => setImageDeleteTarget(image)} disabled={imageDeleting}>
                                 <Trash2 className="text-red-600" />
-                              </Button>
+                              </IconButton>
                             </div>
                           </div>
                         )}
@@ -563,6 +590,16 @@ export default function Products() {
         description={`Sản phẩm “${forceDeleteTarget?.name || ''}” có ${forceDeleteTarget?.orderCount || 0} đơn hàng chưa hủy. Xóa vĩnh viễn sẽ gỡ sản phẩm khỏi dữ liệu và không thể khôi phục.`}
         confirmText="Xóa vĩnh viễn"
         onConfirm={forceDeleteProduct}
+      />
+
+      <ConfirmDialog
+        open={!!imageDeleteTarget}
+        onOpenChange={(open) => !open && setImageDeleteTarget(null)}
+        title="Xóa ảnh sản phẩm?"
+        description={`Ảnh #${imageDeleteTarget?.media_id || ''} sẽ bị gỡ khỏi sản phẩm. File trong thư viện vẫn còn.`}
+        confirmText="Xóa ảnh"
+        busy={imageDeleting}
+        onConfirm={deleteImage}
       />
 
       {detail && (

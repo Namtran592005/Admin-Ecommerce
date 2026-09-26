@@ -6,7 +6,7 @@ import { t } from '../utils/status';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Badge } from './ui/card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from './ui/dialog';
 
 const mediaBase = () => (import.meta.env.VITE_FILES_BASE || 'http://127.0.0.1:9000/unimate').replace(/\/$/, '');
 export const mediaUrl = (key) => `${mediaBase()}/${key}`;
@@ -55,7 +55,7 @@ export function VariantPicker({ onPick }) {
 }
 
 // Chọn đơn hàng: tìm theo mã đơn
-export function OrderPicker({ value, onChange, placeholder = 'Tìm mã đơn ORD...' }) {
+export function OrderPicker({ value, onChange, placeholder = 'Tìm mã đơn ORD...', disabled }) {
   const [options, setOptions] = useState([]);
   const search = async (s) => {
     if (!s) return;
@@ -67,7 +67,8 @@ export function OrderPicker({ value, onChange, placeholder = 'Tìm mã đơn ORD
   return (
     <select value={value || ''} onChange={(e) => onChange(e.target.value ? Number(e.target.value) : null)}
       onFocus={() => { if (!options.length) search('ORD'); }}
-      className="flex h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm shadow-sm">
+      disabled={disabled}
+      className="flex h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm shadow-sm disabled:cursor-not-allowed disabled:opacity-50">
       <option value="">{placeholder}</option>
       {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
     </select>
@@ -111,6 +112,10 @@ export function MediaPicker({ value, onChange, kind = 'all' }) {
               </button>
             ))}
           </div>
+          {!filtered.length && <p className="py-6 text-center text-sm text-slate-500">Không có ảnh phù hợp. Hãy tải lên ở trang Thư viện trước.</p>}
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setOpen(false)}>Đóng</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </>
@@ -121,7 +126,11 @@ export function PickedTag({ text, onClear }) {
   return (
     <span className="inline-flex items-center gap-1.5 rounded-md bg-blue-100 px-2 py-1 text-xs font-medium text-blue-800">
       <Check className="size-3.5" />{text}
-      <button onClick={onClear} className="rounded p-0.5 hover:bg-blue-200" aria-label="Đổi"><X className="size-3.5" /></button>
+      {onClear && (
+        <button type="button" onClick={onClear} className="rounded p-0.5 hover:bg-blue-200" aria-label="Bỏ chọn">
+          <X className="size-3.5" />
+        </button>
+      )}
     </span>
   );
 }

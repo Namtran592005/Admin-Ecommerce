@@ -4,7 +4,7 @@ import { toast } from 'sonner';
 import { api, errMsg } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import { Button } from '../components/ui/button';
-import { Input, Field } from '../components/ui/input';
+import { Input, Field, Select } from '../components/ui/input';
 import { Card, CardContent, Badge } from '../components/ui/card';
 import { TableWrap, THead, Tr, Th, Td, Empty, Toolbar } from '../components/ui/table';
 import { Tabs, ConfirmDialog, IconButton, RowActions } from '../components/ui/misc';
@@ -12,7 +12,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { MediaPicker, mediaUrl } from '../components/pickers';
 
 const CAT_ICONS = ['bi-bag', 'bi-basket', 'bi-basket3', 'bi-tag', 'bi-tags', 'bi-gift', 'bi-house', 'bi-phone', 'bi-laptop', 'bi-controller', 'bi-headphones', 'bi-watch', 'bi-camera', 'bi-bicycle', 'bi-book', 'bi-pencil', 'bi-brush', 'bi-gem', 'bi-lamp', 'bi-tools', 'bi-heart-pulse', 'bi-cup-straw', 'bi-egg-fried', 'bi-cart', 'bi-star', 'bi-truck', 'bi-ticket-perforated'];
-const inputCls = 'flex h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm shadow-sm';
 const ATTRIBUTE_TYPES = [
   { value: 'text', label: 'Văn bản' },
   { value: 'color', label: 'Màu sắc' },
@@ -402,14 +401,13 @@ export default function Catalog() {
                 </Field>
                 <Field label="Biểu tượng hiển thị ở website (dùng khi danh mục chưa có ảnh)">
                   <div className="flex items-center gap-2">
-                    <select
-                      className={inputCls}
+                    <Select
                       value={catForm.icon || ''}
                       onChange={(e) => setCatForm((value) => ({ ...value, icon: e.target.value || null }))}
                     >
                       <option value="">Không dùng biểu tượng</option>
                       {CAT_ICONS.map((icon) => <option key={icon} value={icon}>{icon}</option>)}
-                    </select>
+                    </Select>
                     {catForm.icon && <i className={`bi ${catForm.icon}`} style={{ fontSize: 24, color: '#0f4c81' }}></i>}
                   </div>
                 </Field>
@@ -422,10 +420,10 @@ export default function Catalog() {
                   </Field>
                 </div>
                 <Field label="Trạng thái">
-                  <select className={inputCls} value={catForm.status || 'active'} onChange={(e) => setCatForm((value) => ({ ...value, status: e.target.value }))}>
+                  <Select value={catForm.status || 'active'} onChange={(e) => setCatForm((value) => ({ ...value, status: e.target.value }))}>
                     <option value="active">Đang hiện</option>
                     <option value="inactive">Đang ẩn</option>
-                  </select>
+                  </Select>
                 </Field>
               </div>
             </Crud>
@@ -472,10 +470,10 @@ export default function Catalog() {
                   <Input value={brandForm.description || ''} onChange={(e) => setBrandForm((value) => ({ ...value, description: e.target.value }))} />
                 </Field>
                 <Field label="Trạng thái">
-                  <select className={inputCls} value={brandForm.status || 'active'} onChange={(e) => setBrandForm((value) => ({ ...value, status: e.target.value }))}>
+                  <Select value={brandForm.status || 'active'} onChange={(e) => setBrandForm((value) => ({ ...value, status: e.target.value }))}>
                     <option value="active">Đang hiện</option>
                     <option value="inactive">Đang ẩn</option>
-                  </select>
+                  </Select>
                 </Field>
               </div>
             </Crud>
@@ -545,10 +543,10 @@ export default function Catalog() {
               {canWriteProducts && (
                 <div className="mt-3">
                   <Toolbar>
-                    <select value={attrId} onChange={(e) => setAttrId(e.target.value)} className={inputCls}>
+                    <Select value={attrId} onChange={(e) => setAttrId(e.target.value)}>
                       <option value="">Chọn thuộc tính...</option>
                       {attrs.map((attribute) => <option key={attribute.id} value={attribute.id}>{attribute.name}</option>)}
-                    </select>
+                    </Select>
                     <Input placeholder="Giá trị (M...)" value={valForm.value || ''} className="max-w-[160px]" onChange={(e) => setValForm((value) => ({ ...value, value: e.target.value }))} />
                     <Input placeholder="Tên hiển thị" value={valForm.display_value || ''} className="max-w-[160px]" onChange={(e) => setValForm((value) => ({ ...value, display_value: e.target.value }))} />
                     <Button disabled={savingVal} onClick={saveAttrValue}>{savingVal ? 'Đang lưu...' : 'Thêm giá trị'}</Button>
@@ -574,9 +572,9 @@ export default function Catalog() {
             </Field>
             <div className="grid grid-cols-2 gap-3">
               <Field label="Kiểu hiển thị">
-                <select className={inputCls} value={attrForm.display_type} onChange={(e) => setAttrForm((value) => ({ ...value, display_type: e.target.value }))}>
+                <Select value={attrForm.display_type} onChange={(e) => setAttrForm((value) => ({ ...value, display_type: e.target.value }))}>
                   {ATTRIBUTE_TYPES.map((type) => <option key={type.value} value={type.value}>{type.label}</option>)}
-                </select>
+                </Select>
               </Field>
               <Field label="Sắp xếp">
                 <Input type="number" value={attrForm.sort_order ?? 0} onChange={(e) => setAttrForm((value) => ({ ...value, sort_order: Number(e.target.value) || 0 }))} />

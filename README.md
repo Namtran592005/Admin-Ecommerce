@@ -15,7 +15,8 @@ cd ..\backend
 docker compose --env-file .env.docker up -d --build
 ```
 
-Mở <http://127.0.0.1:8080>, đăng nhập `admin@example.com` / `Admin123!`.
+Mở <http://127.0.0.1:8080>, đăng nhập `admin@example.com` / `Admin@123`. Lần đầu hệ
+thống bắt buộc đổi mật khẩu trước khi vào được trang quản trị.
 
 Chạy riêng để phát triển:
 
@@ -48,10 +49,10 @@ build lại image — biến được nướng vào lúc build.
 | Thanh toán | Đối soát, hoàn tiền, quản lý phương thức thanh toán |
 | Vận chuyển | Vận đơn, hành trình, quản lý hình thức giao và phí ship |
 | Khuyến mãi | Mã giảm giá và chương trình sale, xem lượt đã dùng |
-| Người dùng | Tách riêng khách hàng và nhân sự, gán/gỡ vai trò, khoá tài khoản |
+| Người dùng | Tách riêng khách hàng và nhân sự, gán/gỡ vai trò, khoá tài khoản, **đặt lại mật khẩu** (tự sinh mật khẩu ngẫu nhiên, thu hồi phiên cũ, bắt đổi khi đăng nhập lại) |
 | Đánh giá & Đổi trả | Duyệt đánh giá, xử lý yêu cầu trả hàng |
 | Hóa đơn & Dòng tiền | Xuất hóa đơn VAT, ghi thu chi |
-| Marketing | Chiến dịch, banner, soạn và gửi email HTML hàng loạt |
+| Marketing | Chiến dịch (thêm/sửa/xoá/bật tắt), banner (thêm/sửa/xoá/bật tắt, đổi thứ tự, ảnh riêng cho mobile), soạn và gửi email HTML hàng loạt |
 | Hệ thống | Cấu hình, thông báo, nhật ký thao tác |
 
 Tài khoản khách hàng đăng nhập nhầm vào đây sẽ thấy trang 403.

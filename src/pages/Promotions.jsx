@@ -40,7 +40,7 @@ const EMPTY_COUPON = {
   usage_limit_per_user: '',
   from: '',
   to: '',
-  status: 'active',
+  status: 'draft',
 };
 const EMPTY_PROMOTION = {
   name: '',
@@ -133,15 +133,25 @@ export default function Promotions() {
   };
 
   const saveCoupon = async () => {
-    const code = couponForm.code.trim();
-    if (!code || couponForm.value === '' || couponForm.value === undefined) {
-      toast.error('Vui nhập mã và giá trị');
-      return;
+    const code = couponForm.code.trim().toUpperCase();
+    if (!code) return toast.error('Vui nhập mã');
+    if (!/^[A-Z0-9_-]{3,30}$/.test(code)) return toast.error('Mã chỉ gồm chữ in hoa, số, gạch dưới, gạch ngang (3-30 ký tự)');
+    const isFreeShip = couponForm.type === 'free_shipping';
+    const v = Number(couponForm.value);
+    if (!isFreeShip) {
+      if (couponForm.value === '' || couponForm.value === undefined || !Number.isFinite(v)) {
+        return toast.error('Vui nhập giá trị');
+      }
+      if (couponForm.type === 'percentage' && (v < 0 || v > 100)) return toast.error('Phần trăm phải từ 0 đến 100');
+      if (couponForm.type === 'fixed' && v <= 0) return toast.error('Số tiền giảm phải lớn hơn 0');
+    }
+    if (couponForm.from && couponForm.to && new Date(couponForm.to) <= new Date(couponForm.from)) {
+      return toast.error('Thời gian kết thúc phải sau thời gian bắt đầu');
     }
     const body = {
       code,
       type: couponForm.type,
-      value: Number(couponForm.value),
+      value: isFreeShip ? 0 : v,
       minimum_order_amount: numberOrNull(couponForm.minimum_order_amount),
       maximum_discount_amount: numberOrNull(couponForm.maximum_discount_amount),
       usage_limit: numberOrNull(couponForm.usage_limit),
@@ -251,6 +261,12 @@ export default function Promotions() {
     if (!name || !promotionForm.type) {
       toast.error('Vui nhập tên và loại chương trình');
       return;
+    }
+    if (promotionForm.starts_at && promotionForm.ends_at && new Date(promotionForm.ends_at) <= new Date(promotionForm.starts_at)) {
+      return toast.error('Thời gian kết thúc phải sau thời gian bắt đầu');
+    }
+    if (promotionForm.type === 'percentage' && numberOrNull(promotionForm.value) > 100) {
+      return toast.error('Phần trăm phải từ 0 đến 100');
     }
     const body = {
       name,
@@ -433,13 +449,19 @@ export default function Promotions() {
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader><DialogTitle>{couponEditing ? 'Sửa mã' : 'Thêm mã'}</DialogTitle></DialogHeader>
           <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="Mã *"><Input value={couponForm.code} onChange={(e) => setCouponField('code', e.target.value)} /></Field>
+            <Field label="Mã *" hint="Chữ in hoa, số, gạch dưới, gạch ngang">
+              <Input value={couponForm.code} onChange={(e) => setCouponField('code', e.target.value.toUpperCase().replace(/\s+/g, '_'))} className="uppercase" />
+            </Field>
             <Field label="Loại">
               <Select value={couponForm.type} onChange={(e) => setCouponField('type', e.target.value)}>
                 {COUPON_TYPES.map((type) => <option key={type.value} value={type.value}>{type.label}</option>)}
               </Select>
             </Field>
-            <Field label="Giá trị *"><Input type="number" min={0} value={couponForm.value} onChange={(e) => setCouponField('value', e.target.value === '' ? '' : Number(e.target.value))} /></Field>
+            {couponForm.type !== 'free_shipping' && (
+              <Field label="Giá trị *" hint={couponForm.type === 'percentage' ? 'Từ 0 đến 100' : 'Số tiền giảm'}>
+                <Input type="number" min={0} value={couponForm.value} onChange={(e) => setCouponField('value', e.target.value === '' ? '' : Number(e.target.value))} />
+              </Field>
+            )}
             <Field label="Đơn tối thiểu"><Input type="number" min={0} value={couponForm.minimum_order_amount} onChange={(e) => setCouponField('minimum_order_amount', e.target.value === '' ? '' : Number(e.target.value))} /></Field>
             <Field label="Giảm tối đa"><Input type="number" min={0} value={couponForm.maximum_discount_amount} onChange={(e) => setCouponField('maximum_discount_amount', e.target.value === '' ? '' : Number(e.target.value))} /></Field>
             <Field label="Giới hạn lượt"><Input type="number" min={1} value={couponForm.usage_limit} onChange={(e) => setCouponField('usage_limit', e.target.value === '' ? '' : Number(e.target.value))} /></Field>

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Pencil, Plus, Trash2, X } from 'lucide-react';
+import { KeyRound, Pencil, Plus, Trash2, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { api, errMsg } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
@@ -53,6 +53,9 @@ export default function Users() {
   const [removingRoleId, setRemovingRoleId] = useState(null);
   const [userDeleteTarget, setUserDeleteTarget] = useState(null);
   const [userForceDeleteTarget, setUserForceDeleteTarget] = useState(null);
+  const [pwTarget, setPwTarget] = useState(null);
+  const [pwForm, setPwForm] = useState({ password: '', confirm: '', must_change_password: true });
+  const [pwSaving, setPwSaving] = useState(false);
 
   const load = async (page = 1, quiet = false) => {
     try {
@@ -262,6 +265,52 @@ export default function Users() {
 
   const setS = (key, value) => setSf((current) => ({ ...current, [key]: value }));
 
+  const openPasswordDialog = (row) => {
+    if (String(row.id) === String(user?.id)) {
+      return toast.warning('Bạn không thể tự đặt lại mật khẩu. Dùng mục Hồ sơ để đổi.');
+    }
+    setPwForm({ password: '', confirm: '', must_change_password: true });
+    setPwTarget({ id: row.id, label: row.email || row.phone || `#${row.id}` });
+  };
+
+  const generatePassword = () => {
+    const upper = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+    const lower = 'abcdefghijkmnopqrstuvwxyz';
+    const digit = '23456789';
+    const sym = '!@#$%&*';
+    const all = upper + lower + digit + sym;
+    const arr = new Uint32Array(14);
+    crypto.getRandomValues(arr);
+    const chars = [upper[arr[0] % upper.length], lower[arr[1] % lower.length], digit[arr[2] % digit.length], sym[arr[3] % sym.length]];
+    for (let i = 4; i < 14; i++) chars.push(all[arr[i] % all.length]);
+    for (let i = chars.length - 1; i > 0; i--) {
+      const j = arr[i] % (i + 1);
+      [chars[i], chars[j]] = [chars[j], chars[i]];
+    }
+    const value = chars.join('');
+    setPwForm((current) => ({ ...current, password: value, confirm: value }));
+  };
+
+  const submitPassword = async () => {
+    if (!pwTarget) return;
+    if (pwForm.password.length < 8) return toast.error('Mật khẩu tối thiểu 8 ký tự');
+    if (pwForm.password !== pwForm.confirm) return toast.error('Xác nhận mật khẩu không khớp');
+    setPwSaving(true);
+    try {
+      await api.post(`/users/${pwTarget.id}/reset-password`, {
+        password: pwForm.password,
+        must_change_password: pwForm.must_change_password,
+      });
+      toast.success(`Đã đặt lại mật khẩu cho ${pwTarget.label}. Phiên đăng nhập cũ đã bị thu hồi.`);
+      setPwTarget(null);
+      if (sel && String(selectedUser?.id) === String(pwTarget.id)) await open(pwTarget.id);
+    } catch (e) {
+      toast.error(errMsg(e));
+    } finally {
+      setPwSaving(false);
+    }
+  };
+
   return (
     <div>
       <PageHeader
@@ -298,9 +347,14 @@ export default function Users() {
                   <Td><RowActions>
                     <Button size="sm" variant="outline" onClick={() => open(row.id)}>Chi tiết</Button>
                     {writable && (
-                      <IconButton label="Sửa người dùng" onClick={() => startEdit(row.id)} disabled={editLoadingId !== null}>
-                        <Pencil />
-                      </IconButton>
+                      <>
+                        <IconButton label="Đặt lại mật khẩu" onClick={() => openPasswordDialog(row)}>
+                          <KeyRound />
+                        </IconButton>
+                        <IconButton label="Sửa người dùng" onClick={() => startEdit(row.id)} disabled={editLoadingId !== null}>
+                          <Pencil />
+                        </IconButton>
+                      </>
                     )}
                   </RowActions></Td>
                 </Tr>
@@ -315,6 +369,9 @@ export default function Users() {
                 <div className="font-semibold">#{selectedUser.id} {selectedUser.email || selectedUser.phone}</div>
                 {writable && (
                   <RowActions>
+                    <IconButton label="Đặt lại mật khẩu" onClick={() => openPasswordDialog(selectedUser)}>
+                      <KeyRound />
+                    </IconButton>
                     <IconButton label="Xóa người dùng" onClick={startUserDelete}><Trash2 className="text-red-600" /></IconButton>
                   </RowActions>
                 )}
@@ -427,6 +484,63 @@ export default function Users() {
           <DialogFooter>
             <Button variant="outline" disabled={staffSaving} onClick={() => setStaffOpen(false)}>Hủy</Button>
             <Button disabled={staffSaving} onClick={addStaff}>{staffSaving ? 'Đang lưu...' : 'Lưu'}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!pwTarget} onOpenChange={(openState) => !pwSaving && !openState && setPwTarget(null)}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader><DialogTitle>Đặt lại mật khẩu</DialogTitle></DialogHeader>
+          <p className="-mt-1 text-sm text-slate-600">
+            Đặt mật khẩu mới cho <span className="font-medium text-slate-900">{pwTarget?.label}</span>.
+            Toàn bộ phiên đăng nhập đang mở của tài khoản này sẽ bị thu hồi ngay.
+          </p>
+          <div className="grid gap-3">
+            <Field label="Mật khẩu mới *" hint="Tối thiểu 8 ký tự">
+              <div className="flex gap-2">
+                <Input
+                  type="text"
+                  className="font-mono"
+                  value={pwForm.password}
+                  onChange={(e) => setPwForm((c) => ({ ...c, password: e.target.value }))}
+                  placeholder="Nhập hoặc sinh tự động"
+                />
+                <Button type="button" variant="outline" onClick={generatePassword} className="shrink-0">
+                  Sinh
+                </Button>
+              </div>
+            </Field>
+            <Field label="Xác nhận mật khẩu *">
+              <Input
+                type="text"
+                className="font-mono"
+                value={pwForm.confirm}
+                onChange={(e) => setPwForm((c) => ({ ...c, confirm: e.target.value }))}
+              />
+            </Field>
+            <Field label="Ảnh xem trước">
+              <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                {pwForm.password
+                  ? <span className="break-all font-mono text-slate-800">{pwForm.password}</span>
+                  : <span className="text-slate-400">Chưa có mật khẩu</span>}
+                <div className="mt-1 text-slate-500">Cần gửi kênh bảo mật cho người dùng. Nên tạo mật khẩu ngẫu nhiên thay vì tự đặt.</div>
+              </div>
+            </Field>
+            <label className="flex items-start gap-2 text-sm text-slate-700">
+              <input
+                type="checkbox"
+                className="mt-0.5"
+                checked={pwForm.must_change_password}
+                onChange={(e) => setPwForm((c) => ({ ...c, must_change_password: e.target.checked }))}
+              />
+              <span>Bắt buộc đổi mật khẩu khi đăng nhập lần tới</span>
+            </label>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" disabled={pwSaving} onClick={() => setPwTarget(null)}>Hủy</Button>
+            <Button disabled={pwSaving || !pwForm.password} onClick={submitPassword}>
+              {pwSaving ? 'Đang lưu...' : 'Đặt lại mật khẩu'}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

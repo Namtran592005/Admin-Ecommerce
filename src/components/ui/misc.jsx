@@ -58,22 +58,32 @@ export const ConfirmButton = ({ title, onConfirm, children, ...props }) => {
 
 export const ConfirmDialog = ({ open, onOpenChange, title, description, confirmText = 'Xóa', onConfirm, busy, tone = 'danger' }) => {
   const [running, setRunning] = React.useState(false);
+  const busyNow = running || busy;
+  React.useEffect(() => { if (open) setRunning(false); }, [open]);
   const run = async () => {
+    if (busyNow) return;
     setRunning(true);
-    try { await onConfirm(); onOpenChange(false); } finally { setRunning(false); }
+    try {
+      await onConfirm();
+      onOpenChange(false);
+    } catch {
+      /* onConfirm tự hiển thị lỗi; giữ modal mở để người dùng thử lại */
+    } finally {
+      setRunning(false);
+    }
   };
   return (
-    <Dialog open={open} onOpenChange={(v) => !running && onOpenChange(v)}>
+    <Dialog open={open} onOpenChange={(v) => !busyNow && onOpenChange(v)}>
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
         </DialogHeader>
         {description && <p className="text-sm text-slate-600">{description}</p>}
         <DialogFooter>
-          <Button variant="outline" disabled={running} onClick={() => onOpenChange(false)}>Hủy</Button>
+          <Button variant="outline" disabled={busyNow} onClick={() => onOpenChange(false)}>Hủy</Button>
           <Button
             variant={tone === 'danger' ? 'destructive' : 'default'}
-            disabled={running || busy}
+            disabled={busyNow}
             onClick={run}
           >
             {running ? 'Đang xử lý...' : confirmText}
@@ -88,15 +98,16 @@ export const RowActions = ({ children }) => (
   <div className="flex items-center justify-end gap-1">{children}</div>
 );
 
-export const IconButton = ({ label, onClick, children, disabled }) => (
+export const IconButton = ({ label, onClick, children, disabled, variant = 'ghost', className, ...rest }) => (
   <Button
     size="sm"
-    variant="ghost"
+    variant={variant}
     title={label}
     aria-label={label}
     disabled={disabled}
     onClick={onClick}
-    className="h-8 w-8 p-0"
+    className={cn('h-8 w-8 p-0', className)}
+    {...rest}
   >
     {children}
   </Button>

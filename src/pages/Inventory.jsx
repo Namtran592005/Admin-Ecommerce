@@ -5,14 +5,13 @@ import { api, errMsg, fmtDate } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import { t } from '../utils/status';
 import { Button } from '../components/ui/button';
-import { Input, Field } from '../components/ui/input';
+import { Input, Select, Field } from '../components/ui/input';
 import { Card, CardContent, Badge } from '../components/ui/card';
 import { TableWrap, THead, Tr, Th, Td, Empty, PageHeader } from '../components/ui/table';
 import { Tabs, ConfirmDialog, IconButton, RowActions } from '../components/ui/misc';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
 import { VariantPicker, PickedTag } from '../components/pickers';
 
-const inputCls = 'flex h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm shadow-sm';
 
 const warehousePayload = (value = {}) => ({
   code: value.code || '',
@@ -178,6 +177,7 @@ export default function Inventory() {
   const saveStock = async () => {
     if (!picked) return toast.warning('Chọn biến thể bên dưới');
     if (!st.warehouse_id || st.quantity === undefined || st.quantity === '') return toast.error('Chọn kho và số lượng');
+    if (Number(st.quantity) < 0) return toast.error('Số lượng không được âm');
     setStockSaving(true);
     try {
       await api.put('/inventory/stocks', {
@@ -246,7 +246,8 @@ export default function Inventory() {
   };
   const saveAdj = async () => {
     if (!picked) return toast.warning('Chọn biến thể bên dưới');
-    if (!adj.warehouse_id || adj.new_quantity === undefined || adj.new_quantity === '' || !adj.reason) return toast.error('Điền đủ kho, tồn mới, lý do');
+    if (!adj.warehouse_id || adj.new_quantity === undefined || adj.new_quantity === '' || !adj.reason?.trim()) return toast.error('Điền đủ kho, tồn mới, lý do');
+    if (Number(adj.new_quantity) < 0) return toast.error('Tồn mới không được âm');
     setAdjSaving(true);
     try {
       await api.post('/inventory/adjustments', {
@@ -265,13 +266,20 @@ export default function Inventory() {
       setAdjSaving(false);
     }
   };
-  const postAdj = async (id) => {
+  const [postTarget, setPostTarget] = useState(null);
+  const [postBusy, setPostBusy] = useState(false);
+  const postAdj = async () => {
+    if (!postTarget) return;
+    setPostBusy(true);
     try {
-      await api.post(`/inventory/adjustments/${id}/post`);
+      await api.post(`/inventory/adjustments/${postTarget.id}/post`);
       toast.success('Đã chốt phiếu');
+      setPostTarget(null);
       load(true);
     } catch (e) {
       toast.error(errMsg(e));
+    } finally {
+      setPostBusy(false);
     }
   };
 
@@ -326,10 +334,10 @@ export default function Inventory() {
         {tab === 'adj' && (<>
           {writable && <div className="mb-3"><Button onClick={startAdjCreate}><Plus />Tạo phiếu</Button></div>}
           <TableWrap><table className="w-full text-sm">
-            <THead><Tr><Th>Số phiếu</Th><Th>Kho</Th><Th>Lý do</Th><Th>Trạng thái</Th><Th /></Tr></THead>
+            <THead><Tr><Th>Số phiếu</Th><Th>Kho</Th><Th>Lý do</Th><Th>Trạng thái</Th><Th className="text-right">Thao tác</Th></Tr></THead>
             <tbody>{adjs.map((a) => <Tr key={a.id}><Td>{a.adjustment_number}</Td><Td>{a.warehouse_id}</Td><Td>{a.reason}</Td>
               <Td><Badge>{t('adjust', a.status)}</Badge></Td>
-              <Td>{writable && a.status === 'draft' && <Button size="sm" onClick={() => postAdj(a.id)}>Chốt</Button>}</Td></Tr>)}</tbody>
+              <Td>{writable && a.status === 'draft' && <Button size="sm" onClick={() => setPostTarget(a)}>Chốt</Button>}</Td></Tr>)}</tbody>
           </table></TableWrap>
           {!adjs.length && <Empty />}
         </>)}
@@ -351,10 +359,10 @@ export default function Inventory() {
             <Field label="Tên kho *"><Input value={wh.name || ''} onChange={(e) => setWh({ ...wh, name: e.target.value })} disabled={whSaving} /></Field>
             <Field label="Địa chỉ" className="sm:col-span-2"><Input value={wh.address || ''} onChange={(e) => setWh({ ...wh, address: e.target.value })} disabled={whSaving} /></Field>
             <Field label="Trạng thái">
-              <select className={inputCls} value={wh.status || 'active'} onChange={(e) => setWh({ ...wh, status: e.target.value })} disabled={whSaving}>
+              <Select value={wh.status || 'active'} onChange={(e) => setWh({ ...wh, status: e.target.value })} disabled={whSaving}>
                 <option value="active">Đang hoạt động</option>
                 <option value="inactive">Ngừng hoạt động</option>
-              </select>
+              </Select>
             </Field>
           </div>
           <DialogFooter>
@@ -369,17 +377,17 @@ export default function Inventory() {
           <DialogHeader><DialogTitle>{stockEditing ? 'Sửa tồn kho' : 'Nhập / cập nhật tồn'}</DialogTitle></DialogHeader>
           <Field label="Biến thể">
             {stockEditing
-              ? <PickedTag text={`${picked?.sku || ''} · ${picked?.name || ''}`} />
+              ? <PickedTag text={`${picked?.sku || ''} · ${picked?.name || ''}`} onClear={() => { setPicked(null); setStockEditing(null); }} />
               : picked
                 ? <PickedTag text={`${picked.sku} · ${picked.name}`} onClear={() => setPicked(null)} />
                 : <VariantPicker onPick={(v) => setPicked(v)} />}
           </Field>
           <div className="grid grid-cols-3 gap-3">
             <Field label="Kho *">
-              <select className={inputCls} value={st.warehouse_id || ''} onChange={(e) => setSt({ ...st, warehouse_id: e.target.value ? Number(e.target.value) : null })} disabled={stockSaving}>
+              <Select value={st.warehouse_id || ''} onChange={(e) => setSt({ ...st, warehouse_id: e.target.value ? Number(e.target.value) : null })} disabled={stockSaving}>
                 <option value="">Chọn...</option>
                 {whs.map((w) => <option key={w.id} value={w.id}>{w.code} — {w.name}</option>)}
-              </select>
+              </Select>
             </Field>
             <Field label="Số lượng *"><Input type="number" min={0} value={st.quantity ?? ''} onChange={(e) => setSt({ ...st, quantity: e.target.value === '' ? '' : Number(e.target.value) })} disabled={stockSaving} /></Field>
             <Field label="Ngưỡng"><Input type="number" min={0} value={st.reorder_level ?? ''} onChange={(e) => setSt({ ...st, reorder_level: e.target.value === '' ? '' : Number(e.target.value) })} disabled={stockSaving} /></Field>
@@ -400,10 +408,10 @@ export default function Inventory() {
           </Field>
           <div className="grid grid-cols-2 gap-3">
             <Field label="Kho *">
-              <select className={inputCls} value={adj.warehouse_id || ''} onChange={(e) => setAdj({ ...adj, warehouse_id: e.target.value ? Number(e.target.value) : null })} disabled={adjSaving}>
+              <Select value={adj.warehouse_id || ''} onChange={(e) => setAdj({ ...adj, warehouse_id: e.target.value ? Number(e.target.value) : null })} disabled={adjSaving}>
                 <option value="">Chọn...</option>
                 {whs.map((w) => <option key={w.id} value={w.id}>{w.code} — {w.name}</option>)}
-              </select>
+              </Select>
             </Field>
             <Field label="Tồn mới *"><Input type="number" min={0} value={adj.new_quantity ?? ''} onChange={(e) => setAdj({ ...adj, new_quantity: e.target.value === '' ? '' : Number(e.target.value) })} disabled={adjSaving} /></Field>
           </div>
@@ -444,6 +452,16 @@ export default function Inventory() {
         description={`Mục tồn còn ${stockForceDeleteTarget?.quantity || 0} sản phẩm. Hệ thống sẽ ghi một phiếu điều chỉnh giảm số lượng rồi xóa mục tồn.`}
         confirmText="Xóa và ghi giảm"
         onConfirm={forceRemoveStock}
+      />
+      <ConfirmDialog
+        open={!!postTarget}
+        onOpenChange={(next) => !next && setPostTarget(null)}
+        title="Chốt phiếu điều chỉnh?"
+        description={`Phiếu ${postTarget?.code || postTarget?.id || ''} sẽ được ghi vào tồn kho thật. Sau khi chốt không thể sửa.`}
+        confirmText="Chốt phiếu"
+        tone="default"
+        busy={postBusy}
+        onConfirm={postAdj}
       />
     </div>
   );

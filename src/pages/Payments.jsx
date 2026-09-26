@@ -74,17 +74,23 @@ export default function Payments() {
       toast.error(errMsg(e));
     }
   };
+  const openRefund = () => { setAmount(''); setReason(''); setRefOrder(null); setRefOpen(true); };
+  const closeRefund = (next) => {
+    if (refundSaving) return;
+    setRefOpen(next);
+    if (!next) { setAmount(''); setReason(''); setRefOrder(null); }
+  };
   const createRefund = async () => {
     if (!refOrder) return toast.warning('Chọn đơn hàng');
-    if (!amount) return toast.error('Nhập số tiền');
+    const n = Number(amount);
+    if (amount === '' || !Number.isFinite(n)) return toast.error('Nhập số tiền');
+    if (n <= 0) return toast.error('Số tiền hoàn phải lớn hơn 0');
+    if (!String(reason).trim()) return toast.error('Vui nhập lý do hoàn tiền');
     setRefundSaving(true);
     try {
-      await api.post('/payments/refunds', { order_id: refOrder, amount: Number(amount), reason });
+      await api.post('/payments/refunds', { order_id: refOrder, amount: n, reason: String(reason).trim() });
       toast.success('Đã tạo yêu cầu hoàn tiền');
-      setRefOpen(false);
-      setAmount('');
-      setReason('');
-      setRefOrder(null);
+      closeRefund(false);
       load(true);
     } catch (e) {
       toast.error(errMsg(e));
@@ -195,7 +201,7 @@ export default function Payments() {
 
   return (
     <div>
-      <PageHeader title="Thanh toán" actions={writable && tab === 'ref' && <Button onClick={() => setRefOpen(true)}><Plus />Tạo hoàn tiền</Button>} />
+      <PageHeader title="Thanh toán" actions={writable && tab === 'ref' && <Button onClick={openRefund}><Plus />Tạo hoàn tiền</Button>} />
       <Card><CardContent className="pt-4">
         <Tabs active={tab} onChange={setTab} tabs={[
           { key: 'pay', label: 'Thanh toán' }, { key: 'ref', label: 'Hoàn tiền' }, { key: 'm', label: 'Phương thức' },
@@ -275,26 +281,29 @@ export default function Payments() {
             </table></TableWrap>
             {!sel.transactions.length && <Empty />}
           </>)}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSel(null)}>Đóng</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      <Dialog open={refOpen} onOpenChange={setRefOpen}>
-        <DialogContent>
+      <Dialog open={refOpen} onOpenChange={closeRefund}>
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader><DialogTitle>Tạo hoàn tiền</DialogTitle></DialogHeader>
           <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="Đơn hàng *" className="sm:col-span-2"><OrderPicker value={refOrder} onChange={setRefOrder} /></Field>
-            <Field label="Số tiền *"><Input type="number" min={1} value={amount} onChange={(e) => setAmount(e.target.value)} disabled={refundSaving} /></Field>
-            <Field label="Lý do"><Input value={reason} onChange={(e) => setReason(e.target.value)} disabled={refundSaving} /></Field>
+            <Field label="Đơn hàng *" className="sm:col-span-2"><OrderPicker value={refOrder} onChange={setRefOrder} disabled={refundSaving} /></Field>
+            <Field label="Số tiền *" hint="Số dương, không âm"><Input type="number" min={1} step={1000} value={amount} onChange={(e) => setAmount(e.target.value)} disabled={refundSaving} /></Field>
+            <Field label="Lý do *"><Input value={reason} onChange={(e) => setReason(e.target.value)} disabled={refundSaving} /></Field>
           </div>
           <DialogFooter>
-            <Button variant="outline" disabled={refundSaving} onClick={() => setRefOpen(false)}>Hủy</Button>
+            <Button variant="outline" disabled={refundSaving} onClick={() => closeRefund(false)}>Hủy</Button>
             <Button disabled={refundSaving} onClick={createRefund}>{refundSaving ? 'Đang lưu...' : 'Lưu'}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       <Dialog open={methodOpen} onOpenChange={handleMethodOpenChange}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader><DialogTitle>{methodEditing?.id ? 'Sửa phương thức' : 'Thêm phương thức'}</DialogTitle></DialogHeader>
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="Mã *"><Input value={methodForm.code || ''} onChange={(e) => setMethodForm({ ...methodForm, code: e.target.value })} disabled={methodSaving} /></Field>

@@ -4,6 +4,7 @@ import { ROUTE_PERMS } from './components/menu';
 import { useAuth } from './auth/AuthContext';
 import { Forbidden, NotFound } from './components/ErrorBoundary';
 import Login from './pages/Login';
+import ForcePasswordChange from './pages/ForcePasswordChange';
 import Dashboard from './pages/Dashboard';
 import Orders from './pages/Orders';
 import OrderCreate from './pages/OrderCreate';
@@ -21,7 +22,7 @@ import Marketing from './pages/Marketing';
 import System from './pages/System';
 
 function RequireAuth({ children }) {
-  const { user, ready } = useAuth();
+  const { user, ready, mustChangePassword } = useAuth();
   const loc = useLocation();
   if (!ready) {
     return (
@@ -32,6 +33,7 @@ function RequireAuth({ children }) {
     );
   }
   if (!user) return <Navigate to="/login" state={{ from: loc.pathname }} replace />;
+  if (mustChangePassword) return <ForcePasswordChange />;
   return children;
 }
 
