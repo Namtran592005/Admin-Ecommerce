@@ -26,8 +26,14 @@ function RequireAuth({ children }) {
   const loc = useLocation();
   if (!ready) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-mist">
-        <span className="flex size-11 items-center justify-center rounded-xl bg-brand-500 text-lg font-bold text-white">U</span>
+      <div className="flex min-h-screen flex-col items-center justify-center gap-3.5 bg-mist">
+        <img
+          src="/logo-mark-dark.png"
+          alt="UniMate"
+          width={44}
+          height={44}
+          className="size-11 animate-pulse object-contain"
+        />
         <div className="text-sm text-slate-500">Đang khôi phục phiên đăng nhập...</div>
       </div>
     );
