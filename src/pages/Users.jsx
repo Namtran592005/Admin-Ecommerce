@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { KeyRound, Pencil, Plus, Trash2, X } from 'lucide-react';
+import { KeyRound, Pencil, Plus, Trash2, Upload, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { api, errMsg } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
@@ -10,6 +10,15 @@ import { Card, CardContent, Badge } from '../components/ui/card';
 import { TableWrap, THead, Tr, Th, Td, Empty, Pagination, Toolbar, PageHeader } from '../components/ui/table';
 import { ConfirmDialog, IconButton, RowActions, StatusBadge, Tabs } from '../components/ui/misc';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
+import { MediaPicker } from '../components/pickers';
+
+const Avatar = ({ url, name = '', className = 'size-9' }) => (
+  url
+    ? <img src={url} alt={name} className={`${className} shrink-0 rounded-full border border-slate-200 object-cover`} />
+    : <span className={`${className} flex shrink-0 items-center justify-center rounded-full bg-brand-500 text-xs font-semibold text-white`}>
+      {(name || '?').trim().charAt(0).toUpperCase()}
+    </span>
+);
 
 const isStaff = (roles) => (roles || '').split(',').some((role) => role && role !== 'customer');
 const toDateInput = (value) => value ? String(value).slice(0, 10) : '';
@@ -27,6 +36,7 @@ const EMPTY_EDIT_FORM = {
   first_name: '',
   last_name: '',
   display_name: '',
+  avatar_url: '',
   gender: 'unknown',
   date_of_birth: '',
   marketing_opt_in: false,
@@ -103,6 +113,7 @@ export default function Users() {
         first_name: profile.first_name ?? detail.first_name ?? '',
         last_name: profile.last_name ?? detail.last_name ?? '',
         display_name: profile.display_name ?? detail.display_name ?? '',
+        avatar_url: profile.avatar_url ?? detail.avatar_url ?? '',
         gender: profile.gender || detail.gender || 'unknown',
         date_of_birth: toDateInput(profile.date_of_birth || detail.date_of_birth),
         marketing_opt_in: Boolean(profile.marketing_opt_in ?? detail.marketing_opt_in),
@@ -133,6 +144,7 @@ export default function Users() {
       first_name: editForm.first_name.trim(),
       last_name: editForm.last_name.trim(),
       display_name: editForm.display_name.trim(),
+      avatar_url: editForm.avatar_url.trim(),
       gender: editForm.gender,
       date_of_birth: editForm.date_of_birth,
       marketing_opt_in: editForm.marketing_opt_in,
@@ -336,10 +348,11 @@ export default function Users() {
           </Toolbar>
           <TableWrap>
             <table className="w-full text-sm">
-              <THead><Tr><Th>ID</Th><Th>Email</Th><Th>SĐT</Th><Th>Vai trò</Th><Th>Trạng thái</Th><Th className="text-right">Thao tác</Th></Tr></THead>
+              <THead><Tr><Th>ID</Th><Th>Avatar</Th><Th>Email</Th><Th>SĐT</Th><Th>Vai trò</Th><Th>Trạng thái</Th><Th className="text-right">Thao tác</Th></Tr></THead>
               <tbody>{shown.map((row) => (
                 <Tr key={row.id}>
                   <Td>{row.id}</Td>
+                  <Td><Avatar url={row.avatar_url} name={row.display_name || row.email || row.phone} /></Td>
                   <Td>{row.email || '—'}</Td>
                   <Td>{row.phone || '—'}</Td>
                   <Td><div className="flex flex-wrap gap-1">{(row.roles || '').split(',').filter(Boolean).map((role) => <Badge key={role} color="blue">{roleVI(role)}</Badge>)}</div></Td>
@@ -366,7 +379,14 @@ export default function Users() {
           {sel && selectedUser && (
             <div className="mt-3 rounded-lg border p-3 text-sm">
               <div className="mb-3 flex items-center justify-between gap-2">
-                <div className="font-semibold">#{selectedUser.id} {selectedUser.email || selectedUser.phone}</div>
+                <div className="flex items-center gap-2.5">
+                  <Avatar
+                    url={selectedUser.avatar_url ?? sel?.profile?.avatar_url}
+                    name={sel?.profile?.display_name || selectedUser.email || selectedUser.phone}
+                    className="size-10"
+                  />
+                  <div className="font-semibold">#{selectedUser.id} {selectedUser.email || selectedUser.phone}</div>
+                </div>
                 {writable && (
                   <RowActions>
                     <IconButton label="Đặt lại mật khẩu" onClick={() => openPasswordDialog(selectedUser)}>
@@ -438,6 +458,47 @@ export default function Users() {
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="Email"><Input type="email" value={editForm.email} onChange={(e) => setEditField('email', e.target.value)} /></Field>
             <Field label="Số điện thoại"><Input type="tel" value={editForm.phone} onChange={(e) => setEditField('phone', e.target.value)} /></Field>
+            <Field label="Ảnh đại diện" className="sm:col-span-2" hint="Tải ảnh lên hoặc chọn từ thư viện. Để trống để xoá avatar.">
+              <div className="flex flex-wrap items-center gap-3">
+                <Avatar url={editForm.avatar_url} name={editForm.display_name || editForm.email} className="size-14" />
+                <div className="flex flex-wrap items-center gap-2">
+                  <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-1.5 text-sm shadow-sm hover:bg-slate-50">
+                    <Upload className="size-4" />Tải ảnh lên
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={async (e) => {
+                        const file = e.target.files[0];
+                        e.target.value = '';
+                        if (!file) return;
+                        try {
+                          const fd = new FormData();
+                          fd.append('file', file);
+                          const { data: media } = await api.post('/media/upload', fd);
+                          setEditField('avatar_url', media.url);
+                          toast.success('Đã tải ảnh lên');
+                        } catch (err) { toast.error(errMsg(err)); }
+                      }}
+                    />
+                  </label>
+                  <MediaPicker
+                    value={null}
+                    kind="image"
+                    onChange={async (mediaId) => {
+                      if (!mediaId) return;
+                      try {
+                        const { data: media } = await api.get(`/media/${mediaId}/url`);
+                        setEditField('avatar_url', media.url);
+                      } catch (err) { toast.error(errMsg(err)); }
+                    }}
+                  />
+                  {editForm.avatar_url && (
+                    <Button size="sm" variant="outline" onClick={() => setEditField('avatar_url', '')}>Xoá avatar</Button>
+                  )}
+                </div>
+              </div>
+            </Field>
             <Field label="Trạng thái *">
               <Select value={editForm.status} onChange={(e) => setEditField('status', e.target.value)}>
                 {opts('user', USER_STATUSES).map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}

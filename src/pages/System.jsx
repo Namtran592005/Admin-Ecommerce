@@ -7,6 +7,7 @@ import { Input } from '../components/ui/input';
 import { Card, CardContent, Badge } from '../components/ui/card';
 import { TableWrap, THead, Tr, Th, Td, Empty, PageHeader } from '../components/ui/table';
 import { Tabs } from '../components/ui/misc';
+import PageContent from './PageContent';
 
 export default function System() {
   const { can } = useAuth();
@@ -67,7 +68,7 @@ export default function System() {
       <PageHeader title="Hệ thống" />
       <Card><CardContent className="pt-4">
         <Tabs active={tab} onChange={setTab} tabs={[
-          ...(canSettings ? [{ key: 's', label: 'Cấu hình' }, { key: 'm', label: 'Menu shop' }] : []),
+          ...(canSettings ? [{ key: 's', label: 'Cấu hình' }, { key: 'm', label: 'Menu shop' }, { key: 'c', label: 'Nội dung trang' }] : []),
           { key: 'n', label: 'Thông báo' },
           ...(canAudit ? [{ key: 'a', label: 'Nhật ký' }] : []),
         ]} />
@@ -108,6 +109,7 @@ export default function System() {
             </div>
           </>
         )}
+        {tab === 'c' && canSettings && <PageContent />}
         {tab === 'n' && (
           <><TableWrap><table className="w-full text-sm">
             <THead><Tr><Th>Loại</Th><Th>Tiêu đề</Th><Th>Nội dung</Th><Th>Đã đọc</Th><Th /></Tr></THead>
